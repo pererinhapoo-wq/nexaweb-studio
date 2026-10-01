@@ -504,6 +504,77 @@ export default function App() {
 
           </div>
         </section>
+                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🛡️ SEÇÃO DE CONFIANÇA
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section
+          id="confianca"
+          className="relative z-10 py-20 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60"
+        >
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              <span>Confiança NexaWeb</span>
+            </div>
+
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
+              Um projeto pensado para o seu negócio
+            </h2>
+
+            <p className="text-sm sm:text-base text-neutral-300/90 leading-relaxed max-w-2xl mx-auto">
+              Da primeira informação do briefing à publicação, cada projeto é desenvolvido com atenção à estrutura, ao design e à experiência de navegação.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-7">
+
+            {/* CONFIANÇA 01 */}
+            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-5">
+                <Shield className="w-5 h-5 text-blue-400" />
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Processo claro
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Você escolhe o serviço, envia seu briefing e acompanha o desenvolvimento do projeto até a aprovação.
+              </p>
+            </div>
+
+            {/* CONFIANÇA 02 */}
+            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mb-5">
+                <Laptop className="w-5 h-5 text-emerald-400" />
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Design profissional
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Cada projeto é estruturado para apresentar o negócio de forma moderna, organizada e adaptada para diferentes telas.
+              </p>
+            </div>
+
+            {/* CONFIANÇA 03 */}
+            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mb-5">
+                <Check className="w-5 h-5 text-amber-400" />
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Aprovação antes da publicação
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                O site passa pela etapa de aprovação antes de seguir para publicação, conforme o processo apresentado pela NexaWeb.
+              </p>
+            </div>
+
+          </div>
+        </section>
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             🟦 CATEGORIA 1: PROJETOS ESSENCIAL (12 Cards)
