@@ -1,0 +1,6 @@
+{
+  "name": "NexaWeb - Projetos Essencial e Premium",
+  "description": "Conheça alguns dos sites desenvolvidos pela NexaWeb para diferentes tipos de negócios, organizados nas categorias Essencial e Premium.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
