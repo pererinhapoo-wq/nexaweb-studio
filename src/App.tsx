@@ -51,8 +51,13 @@ export default function App() {
   const [contactModalOpen, setContactModalOpen] = useState<boolean>(false);
   const [selectedServiceLevel, setSelectedServiceLevel] = useState<ServiceLevelType | null>(null);
 
-  const handleOpenBriefing = (level: ServiceLevelType | null = null) => {
-    setSelectedServiceLevel(level);
+  const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
+    const validLevels: ServiceLevelType[] = ['Essencial', 'Profissional', 'Personalizado'];
+    if (level && validLevels.includes(level as ServiceLevelType)) {
+      setSelectedServiceLevel(level as ServiceLevelType);
+    } else {
+      setSelectedServiceLevel('Personalizado');
+    }
     setContactModalOpen(true);
   };
 
@@ -1021,7 +1026,7 @@ export default function App() {
       <Footer />
 
       {/* Project Quick Inspector Modal */}
-      <ProjectModal project={activeProject} onClose={() => setActiveProject(null)} />
+      <ProjectModal project={activeProject} onClose={() => setActiveProject(null)} onOpenBriefing={handleOpenBriefing} />
 
       {/* Contact / Proposal Modal */}
       <ContactModal
