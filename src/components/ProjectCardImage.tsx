@@ -35,7 +35,9 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({ project, cla
 
         <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-neutral-900/90 border border-neutral-800/70 text-[10px] font-mono text-neutral-400 max-w-[190px] sm:max-w-[240px] truncate">
           <Globe className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
-          <span className="truncate">{new URL(project.url).hostname}</span>
+          <span className="truncate">
+  {project.url === '#' ? 'NexaWeb' : new URL(project.url).hostname}
+</span>
         </div>
 
         <span className="text-[10px] font-semibold tracking-wider text-neutral-400">
