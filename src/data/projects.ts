@@ -1,5 +1,12 @@
 export type ProjectTier = 'Essencial' | 'Profissional' | 'Premium';
 
+export interface ProjectPlan {
+  name: 'Essencial' | 'Profissional' | 'Personalizado';
+  price: string;
+  text: string;
+  time: string;
+}
+
 export interface ProjectItem {
   id: string;
   name: string;
@@ -12,353 +19,737 @@ export interface ProjectItem {
   highlights: string[];
   clientIndustry: string;
   accentColor: string;
+
+  // Informações utilizadas no modal "Visão Geral"
+  structure?: string[];
+  plans?: ProjectPlan[];
+
+  // Nome utilizado para abrir o briefing específico
+  briefingType?: string;
 }
 
-// ━━━━━━━━━━━━━━━━━━━━
-// 🟦 PROJETOS ESSENCIAL (12 Projetos)
-// ━━━━━━━━━━━━━━━━━━━━
-export const ESSENCIAL_PROJECTS: ProjectItem[] = [
+const CREATOR_PLANS: ProjectPlan[] = [
   {
-    id: 'influenciador-digital',
-    name: 'Influenciador Digital',
-    category: 'Influência Digital & Conteúdo',
-    tier: 'Essencial',
-    url: 'https://influenciado-digital.vercel.app/',
-    description:
-      'Página otimizada para influenciadores digitais apresentarem seus canais, números de alcance, marcas parceiras e canal direto de assessoria e publicidade.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Presença e autoridade para criadores de impacto',
-    highlights: ['Media Kit Dinâmico', 'Links Rápidos', 'Design Responsivo'],
-    clientIndustry: 'Influência Digital',
-    accentColor: 'from-blue-600/20 to-sky-500/10',
+    name: 'Essencial',
+    price: 'R$ 1.000',
+    text: 'Apresentação do criador, redes sociais, conteúdos, links importantes, contato e publicação.',
+    time: 'Prazo: 3–5 dias',
   },
   {
-    id: 'criador-de-conteudo',
-    name: 'Criador de Conteúdo',
-    category: 'Mídia & Produção Digital',
-    tier: 'Essencial',
-    url: 'https://criador-de-conte-do-essencial.vercel.app/',
-    description:
-      'Site com foco em criadores autônomos, podcasts e streamers, estruturado para centralizar episódios, redes sociais e captação de apoiadores.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Centralização de conteúdos e canais de streaming',
-    highlights: ['Vitrine de Episódios', 'Integração de Redes', 'Acesso Mobile Ágil'],
-    clientIndustry: 'Mídia & Entretenimento',
-    accentColor: 'from-indigo-600/20 to-blue-500/10',
+    name: 'Profissional',
+    price: 'R$ 1.700',
+    text: 'Tudo do Essencial + estrutura mais completa, destaques, novas seções, links personalizados e mais recursos para o criador.',
+    time: 'Prazo: 5–8 dias',
   },
   {
-    id: 'prestador-de-servico',
-    name: 'Prestador de Serviço',
-    category: 'Serviços Profissionais',
-    tier: 'Essencial',
-    url: 'https://nexaweb-prestador.vercel.app/',
-    description:
-      'Solução digital direta e profissional para consultores, técnicos e prestadores autônomos apresentarem seus serviços com botão para orçamento no WhatsApp.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Apresentação clara de serviços e captação de leads',
-    highlights: ['Chamada para WhatsApp', 'Tabela de Serviços', 'Depoimentos de Clientes'],
-    clientIndustry: 'Serviços & Negócios',
-    accentColor: 'from-cyan-600/20 to-blue-500/10',
-  },
-  {
-    id: 'imobiliaria-essencial',
-    name: 'Imobiliária',
-    category: 'Mercado Imobiliário',
-    tier: 'Essencial',
-    url: 'https://nexaweb-imobiliaria.vercel.app/',
-    description:
-      'Portal imobiliário eficiente com listagem de imóveis para venda e locação, fotos destacadas, localização e formulário direto de contato com corretor.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Vitrine imobiliária com foco em conversão rápida',
-    highlights: ['Catálogo de Imóveis', 'Filtro por Tipo', 'Contato com Corretores'],
-    clientIndustry: 'Mercado Imobiliário',
-    accentColor: 'from-emerald-600/20 to-blue-500/10',
-  },
-  {
-    id: 'loja-essencial',
-    name: 'Loja',
-    category: 'E-commerce & Varejo',
-    tier: 'Essencial',
-    url: 'https://nexaweb-loja.vercel.app/',
-    description:
-      'Vitrine virtual moderna para comércio varejista com exibição limpa de produtos, categorias organizadas e navegação pensada para dispositivos móveis.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Vendas e catálogo intuitivo para o varejo',
-    highlights: ['Catálogo Dinâmico', 'Galeria de Produtos', 'Checkout Prático'],
-    clientIndustry: 'Varejo & Moda',
-    accentColor: 'from-sky-600/20 to-teal-500/10',
-  },
-  {
-    id: 'restaurante-sabor-brasa',
-    name: 'Restaurante — Sabor & Brasa',
-    category: 'Gastronomia & Churrascaria',
-    tier: 'Essencial',
-    url: 'https://grok-workspace-puce.vercel.app/',
-    description:
-      'Site convidativo para churrascarias e casas de carnes com destaque para os cortes especiais, ambiente rústico sofisticado e facilidade para reservas.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Tradição do fogo e cortes selecionados na web',
-    highlights: ['Cardápio de Carnes', 'Horários & Endereço', 'Botão de Reserva'],
-    clientIndustry: 'Gastronomia & Churrasco',
-    accentColor: 'from-amber-600/20 to-red-500/10',
-  },
-  {
-    id: 'restaurante-essencial',
-    name: 'Restaurante',
-    category: 'Gastronomia & Culinária',
-    tier: 'Essencial',
-    url: 'https://restaurante-origem.vercel.app/',
-    description:
-      'Experiência digital agradável para bistrôs e restaurantes com menu digital completo, proposta culinária da casa e mapa de localização interativo.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Menu interativo e aconchego para seus clientes',
-    highlights: ['Menu Digital Ilustrado', 'História da Casa', 'Localização Fácil'],
-    clientIndustry: 'Gastronomia & Restaurantes',
-    accentColor: 'from-orange-600/20 to-amber-500/10',
-  },
-  {
-    id: 'academia-essencial',
-    name: 'Academia',
-    category: 'Fitness & Bem-Estar',
-    tier: 'Essencial',
-    url: 'https://nexaweb-academia.vercel.app/',
-    description:
-      'Página energética para academias e estúdios esportivos, apresentando modalidades de treino, estrutura de musculação e planos mensais acessíveis.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Energia, treinos e captação de novos alunos',
-    highlights: ['Grade de Aulas', 'Planos de Adesão', 'Formulário de Matrícula'],
-    clientIndustry: 'Fitness & Treinamento',
-    accentColor: 'from-blue-600/20 to-emerald-500/10',
-  },
-  {
-    id: 'kings-barber',
-    name: "King's Barber",
-    category: 'Barbearia & Estilo Masculino',
-    tier: 'Essencial',
-    url: 'https://kings-barber-two.vercel.app/',
-    description:
-      'Site com visual autêntico e moderno para barbearias, com tabela de serviços de corte e barba, profissionais da equipe e agendamento prático.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Cortes clássicos e modernos com presença marcante',
-    highlights: ['Tabela de Cortes', 'Agendamento Direto', 'Galeria de Estilos'],
-    clientIndustry: 'Barbearia & Beleza',
-    accentColor: 'from-slate-600/20 to-blue-500/10',
-  },
-  {
-    id: 'nexaweb-portfolio',
-    name: 'NexaWeb Portfolio',
-    category: 'Portfólio Institucional',
-    tier: 'Essencial',
-    url: 'https://nexaweb-portfolio-lake.vercel.app/',
-    description:
-      'Vitrine institucional desenvolvida para agências e estúdios criativos apresentarem seus trabalhos, metodologias de desenvolvimento e cases de sucesso.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Demonstração de competência e projetos entregues',
-    highlights: ['Apresentação Institucional', 'Metodologia Ágil', 'Contato Comercial'],
-    clientIndustry: 'Agência & Design Web',
-    accentColor: 'from-blue-600/20 to-purple-500/10',
-  },
-  {
-    id: 'salao',
-    name: 'Salão',
-    category: 'Salão de Beleza & Estética',
-    tier: 'Essencial',
-    url: 'https://nexaweb-salao1.vercel.app/',
-    description:
-      'Website delicado e refinado para salões de cabeleireiro e estética, destacando tratamentos capilares, transformações visuais e agendamento online.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Beleza, autocuidado e sofisticação para o seu espaço',
-    highlights: ['Tratamentos Capilares', 'Galeria Antes & Depois', 'Agendamento Ágil'],
-    clientIndustry: 'Beleza & Cuidados Pessoais',
-    accentColor: 'from-pink-600/20 to-blue-500/10',
-  },
-  {
-    id: 'projeto-grok-workspace',
-    name: 'Projeto Grok Workspace',
-    category: 'Plataforma Digital & Workspace',
-    tier: 'Essencial',
-    url: 'https://grok-workspace-1-three-alpha.vercel.app/',
-    description:
-      'Ambiente digital colaborativo com arquitetura limpa, navegação simplificada e recursos visuais para equipes e projetos produtivos na nuvem.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Espaço funcional para trabalho e colaboração digital',
-    highlights: ['Interface Produtiva', 'Layout Modular', 'Performance Rápida'],
-    clientIndustry: 'Tecnologia & Produtividade',
-    accentColor: 'from-cyan-600/20 to-slate-500/10',
+    name: 'Personalizado',
+    price: 'A partir de R$ 2.800',
+    text: 'Estrutura sob medida para projetos com identidade própria, integrações, recursos especiais e necessidades específicas.',
+    time: 'Prazo: conforme projeto',
   },
 ];
 
-// ━━━━━━━━━━━━━━━━━━━━
-// 🟩 PROJETOS PROFISSIONAL (3 Projetos)
-// ━━━━━━━━━━━━━━━━━━━━
+const DEFAULT_PLANS: ProjectPlan[] = [
+  {
+    name: 'Essencial',
+    price: '',
+    text: 'Estrutura profissional para apresentar o negócio, seus serviços e principais informações.',
+    time: '',
+  },
+  {
+    name: 'Profissional',
+    price: '',
+    text: 'Estrutura mais completa, com novas seções, recursos e personalizações para o negócio.',
+    time: '',
+  },
+  {
+    name: 'Personalizado',
+    price: '',
+    text: 'Projeto sob medida de acordo com as necessidades específicas do negócio.',
+    time: '',
+  },
+];
+
+export const ESSENCIAL_PROJECTS: ProjectItem[] = [
+  {
+    id: 'influenciador',
+    name: 'Influenciador Digital',
+    category: 'Criador de Conteúdo',
+    tier: 'Essencial',
+    url: 'https://influenciado-digital.vercel.app/',
+    description:
+      'Site profissional para influenciadores e criadores que desejam reunir sua apresentação, conteúdos, redes sociais e principais links em um único lugar.',
+    fallbackImage: '',
+    tagline: 'Sua presença digital em um só lugar.',
+    highlights: [
+      'Apresentação profissional',
+      'Redes sociais',
+      'Conteúdos e destaques',
+      'Links importantes',
+      'Contato',
+    ],
+    clientIndustry: 'Criador de Conteúdo',
+    accentColor: 'blue',
+    briefingType: 'Criador de Conteúdo',
+    structure: [
+      'Apresentação do criador',
+      'Sobre o criador',
+      'Redes sociais',
+      'Conteúdos e destaques',
+      'Links importantes',
+      'Contato',
+    ],
+    plans: CREATOR_PLANS,
+  },
+
+  {
+    id: 'criador-conteudo',
+    name: 'Criador de Conteúdo',
+    category: 'Criador de Conteúdo',
+    tier: 'Essencial',
+    url: 'https://criador-de-conte-do-essencial.vercel.app/',
+    description:
+      'Modelo profissional para criadores de conteúdo apresentarem seu trabalho, redes sociais, conteúdos e links importantes.',
+    fallbackImage: '',
+    tagline: 'Apresente seu conteúdo de forma profissional.',
+    highlights: [
+      'Perfil do criador',
+      'Redes sociais',
+      'Conteúdos',
+      'Links personalizados',
+      'Contato',
+    ],
+    clientIndustry: 'Criador de Conteúdo',
+    accentColor: 'blue',
+    briefingType: 'Criador de Conteúdo',
+    structure: [
+      'Apresentação do criador',
+      'Sobre',
+      'Redes sociais',
+      'Conteúdos',
+      'Links importantes',
+      'Contato',
+    ],
+    plans: CREATOR_PLANS,
+  },
+
+  {
+    id: 'prestador-servico',
+    name: 'Prestador de Serviço',
+    category: 'Prestador de Serviço',
+    tier: 'Essencial',
+    url: 'https://nexaweb-prestador.vercel.app/',
+    description:
+      'Site profissional para apresentar serviços, diferenciais, informações de contato e facilitar a conexão com clientes.',
+    fallbackImage: '',
+    tagline: 'Apresente seus serviços com profissionalismo.',
+    highlights: [
+      'Apresentação profissional',
+      'Serviços',
+      'Diferenciais',
+      'Informações de contato',
+      'Chamada para ação',
+    ],
+    clientIndustry: 'Prestador de Serviço',
+    accentColor: 'blue',
+    briefingType: 'Prestador de Serviço',
+    structure: [
+      'Apresentação',
+      'Sobre o profissional',
+      'Serviços',
+      'Diferenciais',
+      'Contato',
+      'Chamada para ação',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'imobiliaria',
+    name: 'Imobiliária',
+    category: 'Imobiliária',
+    tier: 'Essencial',
+    url: 'https://nexaweb-imobiliaria.vercel.app/',
+    description:
+      'Site profissional para imobiliárias apresentarem seus imóveis, serviços e formas de contato.',
+    fallbackImage: '',
+    tagline: 'Uma presença digital profissional para sua imobiliária.',
+    highlights: [
+      'Apresentação da imobiliária',
+      'Imóveis',
+      'Informações dos imóveis',
+      'Contato',
+      'Atendimento',
+    ],
+    clientIndustry: 'Imobiliária',
+    accentColor: 'blue',
+    briefingType: 'Imobiliária',
+    structure: [
+      'Apresentação da imobiliária',
+      'Imóveis',
+      'Detalhes dos imóveis',
+      'Sobre a empresa',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'loja',
+    name: 'Loja',
+    category: 'Loja / E-commerce',
+    tier: 'Essencial',
+    url: 'https://nexaweb-loja.vercel.app/',
+    description:
+      'Modelo profissional para lojas apresentarem seus produtos, informações e canais de atendimento.',
+    fallbackImage: '',
+    tagline: 'Sua loja apresentada de forma profissional.',
+    highlights: [
+      'Apresentação da loja',
+      'Produtos',
+      'Categorias',
+      'Informações',
+      'Contato',
+    ],
+    clientIndustry: 'Loja',
+    accentColor: 'blue',
+    briefingType: 'Loja',
+    structure: [
+      'Apresentação da loja',
+      'Produtos',
+      'Categorias',
+      'Destaques',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'restaurante-sabor-brasa',
+    name: 'Restaurante — Sabor & Brasa',
+    category: 'Restaurante',
+    tier: 'Essencial',
+    url: 'https://grok-workspace-puce.vercel.app/',
+    description:
+      'Modelo de site para restaurante com apresentação do estabelecimento, cardápio, informações e contato.',
+    fallbackImage: '',
+    tagline: 'Seu restaurante apresentado de forma profissional.',
+    highlights: [
+      'Apresentação',
+      'Cardápio',
+      'Destaques',
+      'Informações',
+      'Contato',
+    ],
+    clientIndustry: 'Restaurante',
+    accentColor: 'blue',
+    briefingType: 'Restaurante',
+    structure: [
+      'Apresentação do restaurante',
+      'Cardápio',
+      'Pratos em destaque',
+      'Sobre',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'restaurante',
+    name: 'Restaurante',
+    category: 'Restaurante',
+    tier: 'Essencial',
+    url: 'https://grok-workspace-puce.vercel.app/',
+    description:
+      'Site profissional para restaurantes apresentarem seu espaço, cardápio, pratos e canais de contato.',
+    fallbackImage: '',
+    tagline: 'Transforme sua presença digital em uma experiência.',
+    highlights: [
+      'Apresentação',
+      'Cardápio',
+      'Pratos',
+      'Informações',
+      'Contato',
+    ],
+    clientIndustry: 'Restaurante',
+    accentColor: 'blue',
+    briefingType: 'Restaurante',
+    structure: [
+      'Apresentação',
+      'Cardápio',
+      'Pratos em destaque',
+      'Sobre o restaurante',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'academia',
+    name: 'Academia',
+    category: 'Academia / Fitness',
+    tier: 'Essencial',
+    url: 'https://nexaweb-academia.vercel.app/',
+    description:
+      'Modelo profissional para academias apresentarem seus espaços, serviços, modalidades e informações.',
+    fallbackImage: '',
+    tagline: 'Uma presença digital forte para sua academia.',
+    highlights: [
+      'Apresentação da academia',
+      'Modalidades',
+      'Estrutura',
+      'Informações',
+      'Contato',
+    ],
+    clientIndustry: 'Academia',
+    accentColor: 'blue',
+    briefingType: 'Academia',
+    structure: [
+      'Apresentação da academia',
+      'Modalidades',
+      'Estrutura',
+      'Benefícios',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'kings-barber',
+    name: 'King’s Barber',
+    category: 'Barbearia',
+    tier: 'Essencial',
+    url: 'https://kings-barber-two.vercel.app/',
+    description:
+      'Modelo profissional para barbearias apresentarem seus serviços, ambiente, diferenciais e formas de contato.',
+    fallbackImage: '',
+    tagline: 'Sua barbearia com presença digital profissional.',
+    highlights: [
+      'Apresentação',
+      'Serviços',
+      'Ambiente',
+      'Diferenciais',
+      'Contato',
+    ],
+    clientIndustry: 'Barbearia',
+    accentColor: 'blue',
+    briefingType: 'Barbearia',
+    structure: [
+      'Apresentação da barbearia',
+      'Serviços',
+      'Preços',
+      'Ambiente',
+      'Diferenciais',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'nexaweb-portfolio',
+    name: 'NexaWeb Portfolio',
+    category: 'Portfólio',
+    tier: 'Essencial',
+    url: 'https://nexaweb-portfolio-lake.vercel.app/',
+    description:
+      'Modelo de portfólio profissional para apresentar projetos, trabalhos e informações de forma organizada.',
+    fallbackImage: '',
+    tagline: 'Mostre seu trabalho com uma apresentação profissional.',
+    highlights: [
+      'Apresentação',
+      'Projetos',
+      'Trabalhos',
+      'Sobre',
+      'Contato',
+    ],
+    clientIndustry: 'Portfólio',
+    accentColor: 'blue',
+    briefingType: 'Portfólio',
+    structure: [
+      'Apresentação',
+      'Sobre',
+      'Projetos',
+      'Trabalhos em destaque',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'salao',
+    name: 'Salão',
+    category: 'Salão de Beleza',
+    tier: 'Essencial',
+    url: 'https://nexaweb-salao1.vercel.app/',
+    description:
+      'Modelo profissional para salões apresentarem seus serviços, ambiente, profissionais e informações.',
+    fallbackImage: '',
+    tagline: 'Uma presença digital elegante para seu salão.',
+    highlights: [
+      'Apresentação',
+      'Serviços',
+      'Profissionais',
+      'Ambiente',
+      'Contato',
+    ],
+    clientIndustry: 'Salão',
+    accentColor: 'blue',
+    briefingType: 'Salão',
+    structure: [
+      'Apresentação do salão',
+      'Serviços',
+      'Profissionais',
+      'Galeria',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+
+  {
+    id: 'grok-workspace',
+    name: 'Projeto Grok Workspace',
+    category: 'Tecnologia',
+    tier: 'Essencial',
+    url: '#',
+    description:
+      'Projeto demonstrativo desenvolvido para explorar uma experiência digital moderna.',
+    fallbackImage: '',
+    tagline: 'Experiência digital moderna.',
+    highlights: [
+      'Interface moderna',
+      'Experiência responsiva',
+      'Apresentação',
+      'Navegação',
+    ],
+    clientIndustry: 'Tecnologia',
+    accentColor: 'blue',
+    briefingType: 'Tecnologia',
+    structure: [
+      'Apresentação',
+      'Recursos',
+      'Destaques',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
+  },
+];
+
 export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
   {
     id: 'nova-arq',
     name: 'NOVA ARQ',
     category: 'Arquitetura',
     tier: 'Profissional',
-    url: 'https://nexaweb-nova-arq-1.vercel.app/',
+    url: '#',
     description:
-      'Site profissional para escritório de arquitetura contemporânea, com apresentação sofisticada de projetos, serviços e processo.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Apresentação sofisticada de projetos, serviços e processo',
-    highlights: ['Portfólio Contemporâneo', 'Serviços Especializados', 'Processo Metodológico'],
+      'Projeto profissional desenvolvido para uma apresentação mais completa e sofisticada de serviços de arquitetura.',
+    fallbackImage: '',
+    tagline: 'Arquitetura apresentada com identidade.',
+    highlights: [
+      'Apresentação profissional',
+      'Projetos',
+      'Serviços',
+      'Portfólio',
+      'Contato',
+    ],
     clientIndustry: 'Arquitetura',
-    accentColor: 'from-emerald-500/20 to-teal-500/10',
+    accentColor: 'emerald',
+    briefingType: 'Arquitetura',
+    structure: [
+      'Apresentação',
+      'Sobre o escritório',
+      'Projetos',
+      'Serviços',
+      'Portfólio',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'lumiere',
     name: 'LUMIÈRE',
-    category: 'Estética e Bem-estar',
+    category: 'Clínica / Saúde',
     tier: 'Profissional',
-    url: 'https://nexaweb-lumiere.vercel.app/',
+    url: '#',
     description:
-      'Site profissional para clínica de estética e bem-estar, com visual elegante, apresentação de tratamentos e foco em experiência e atendimento.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Visual elegante, apresentação de tratamentos e foco em experiência',
-    highlights: ['Tratamentos Exclusivos', 'Experiência & Atendimento', 'Agendamento Direto'],
-    clientIndustry: 'Estética e Bem-estar',
-    accentColor: 'from-teal-500/20 to-emerald-500/10',
+      'Projeto profissional para uma apresentação elegante de serviços, informações e atendimento.',
+    fallbackImage: '',
+    tagline: 'Uma experiência digital elegante.',
+    highlights: [
+      'Apresentação',
+      'Serviços',
+      'Especialidades',
+      'Informações',
+      'Contato',
+    ],
+    clientIndustry: 'Clínica',
+    accentColor: 'emerald',
+    briefingType: 'Clínica',
+    structure: [
+      'Apresentação da clínica',
+      'Especialidades',
+      'Serviços',
+      'Profissionais',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'vertex-digital',
     name: 'VERTEX DIGITAL',
     category: 'Tecnologia',
     tier: 'Profissional',
-    url: 'https://nexaweb-vertex-digital.vercel.app/',
+    url: '#',
     description:
-      'Site profissional para empresa de tecnologia, com apresentação de soluções digitais, cases, processo e serviços.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80',
-    tagline: 'Apresentação de soluções digitais, cases, processo e serviços',
-    highlights: ['Soluções Digitais', 'Cases de Sucesso', 'Processo & Serviços'],
+      'Projeto profissional para empresas de tecnologia que precisam apresentar soluções e serviços de forma clara.',
+    fallbackImage: '',
+    tagline: 'Tecnologia com presença digital profissional.',
+    highlights: [
+      'Apresentação',
+      'Soluções',
+      'Serviços',
+      'Diferenciais',
+      'Contato',
+    ],
     clientIndustry: 'Tecnologia',
-    accentColor: 'from-emerald-600/20 to-cyan-500/10',
+    accentColor: 'emerald',
+    briefingType: 'Tecnologia',
+    structure: [
+      'Apresentação',
+      'Soluções',
+      'Serviços',
+      'Diferenciais',
+      'Sobre a empresa',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
 ];
 
-// ━━━━━━━━━━━━━━━━━━━━
-// 🟨 PROJETOS PREMIUM (7 Projetos)
-// ━━━━━━━━━━━━━━━━━━━━
 export const PREMIUM_PROJECTS: ProjectItem[] = [
   {
     id: 'academia-premium',
     name: 'Academia Premium',
-    category: 'Fitness & Alta Performance',
+    category: 'Academia / Fitness',
     tier: 'Premium',
     url: 'https://academia-premium-beryl.vercel.app/',
     description:
-      'Plataforma de alta sofisticação para rede fitness de luxo. Apresenta infraestrutura de ponta, grade de modalidades dinâmicas, planos de membros e matrícula digital.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Experiência fitness de alto impacto visual e tecnológico',
-    highlights: ['Grade Interativa de Treinos', 'Conversão de Membros', 'Design Imersivo Dark'],
-    clientIndustry: 'Fitness & Bem-Estar',
-    accentColor: 'from-amber-500/20 to-orange-500/10',
+      'Projeto premium desenvolvido para demonstrar uma experiência mais completa para academias.',
+    fallbackImage: '',
+    tagline: 'Experiência premium para sua academia.',
+    highlights: [
+      'Experiência visual premium',
+      'Apresentação completa',
+      'Modalidades',
+      'Estrutura',
+      'Contato',
+    ],
+    clientIndustry: 'Academia',
+    accentColor: 'amber',
+    briefingType: 'Academia',
+    structure: [
+      'Apresentação',
+      'Modalidades',
+      'Estrutura',
+      'Planos',
+      'Benefícios',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'engenharia-premium',
     name: 'Engenharia Premium',
-    category: 'Engenharia & Construção Civil',
+    category: 'Engenharia / Construção',
     tier: 'Premium',
     url: 'https://engenharia-premium.vercel.app/',
     description:
-      'Portal institucional corporativo para empresa de engenharia e grandes obras estruturais. Destaca acervo técnico, certificações de qualidade e solicitação de orçamentos executivos.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Solidez, precisão e autoridade em grandes empreendimentos',
-    highlights: ['Portfólio de Obras Civis', 'Certificações Técnicas', 'Solicitação de Proposta'],
-    clientIndustry: 'Engenharia & Infraestrutura',
-    accentColor: 'from-amber-500/20 to-yellow-500/10',
+      'Projeto premium para empresas de engenharia e construção apresentarem seus serviços e projetos.',
+    fallbackImage: '',
+    tagline: 'Engenharia apresentada com autoridade.',
+    highlights: [
+      'Apresentação premium',
+      'Projetos',
+      'Serviços',
+      'Experiência profissional',
+      'Contato',
+    ],
+    clientIndustry: 'Engenharia',
+    accentColor: 'amber',
+    briefingType: 'Engenharia',
+    structure: [
+      'Apresentação',
+      'Serviços',
+      'Projetos',
+      'Diferenciais',
+      'Sobre a empresa',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'imobiliaria-premium',
     name: 'Imobiliária Premium',
-    category: 'Mercado Imobiliário de Luxo',
+    category: 'Imobiliária',
     tier: 'Premium',
     url: 'https://imobili-ria-premium.vercel.app/',
     description:
-      'Vitrine imobiliária exclusiva para propriedades de alto padrão e condomínios de luxo. Desenvolvida com navegação fluida, busca inteligente e agendamento de visitas privativas.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Arquitetura e exclusividade em cada metro quadrado',
-    highlights: ['Busca Imobiliária Avançada', 'Galerias em Alta Resolução', 'Agendamento Direto'],
-    clientIndustry: 'Mercado Imobiliário',
-    accentColor: 'from-amber-500/20 to-emerald-500/10',
+      'Projeto premium para apresentar imóveis e serviços imobiliários com uma experiência mais sofisticada.',
+    fallbackImage: '',
+    tagline: 'Imóveis apresentados em alto padrão.',
+    highlights: [
+      'Apresentação premium',
+      'Imóveis',
+      'Detalhes',
+      'Localização',
+      'Contato',
+    ],
+    clientIndustry: 'Imobiliária',
+    accentColor: 'amber',
+    briefingType: 'Imobiliária',
+    structure: [
+      'Apresentação',
+      'Imóveis em destaque',
+      'Detalhes dos imóveis',
+      'Localização',
+      'Sobre a empresa',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'loja-premium',
     name: 'Loja Premium',
-    category: 'E-commerce & Varejo Exclusivo',
+    category: 'Loja / E-commerce',
     tier: 'Premium',
-    url: 'https://loja-premium-delta.vercel.app/',
+    url: 'https://loja-premium.vercel.app/',
     description:
-      'Loja virtual de alto padrão projetada para marcas requintadas. Experiência de compra fluida, vitrine de produtos minimalista, catálogo responsivo e foco em ticket médio.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Varejo digital com estética minimalista e conversão máxima',
-    highlights: ['Catálogo Fluido de Produtos', 'Foco em Vendas & Ticket Alto', 'Checkout Otimizado'],
-    clientIndustry: 'E-commerce & Moda',
-    accentColor: 'from-amber-500/20 to-rose-500/10',
+      'Projeto premium desenvolvido para apresentar uma loja com experiência visual mais completa.',
+    fallbackImage: '',
+    tagline: 'Uma experiência premium para sua loja.',
+    highlights: [
+      'Experiência premium',
+      'Produtos',
+      'Categorias',
+      'Destaques',
+      'Contato',
+    ],
+    clientIndustry: 'Loja',
+    accentColor: 'amber',
+    briefingType: 'Loja',
+    structure: [
+      'Apresentação',
+      'Produtos',
+      'Categorias',
+      'Destaques',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'clinica-premium',
     name: 'Clínica Premium',
-    category: 'Saúde & Medicina Especializada',
+    category: 'Clínica / Saúde',
     tier: 'Premium',
-    url: 'https://cl-nica-premium-1.vercel.app/',
+    url: 'https://grok-workspace-1-three-alpha.vercel.app/',
     description:
-      'Presença digital humanizada para clínica médica e estética de alta credibilidade. Apresentação detalhada do corpo clínico, especialidades médicas e agendamento facilitado.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Credibilidade médica e acolhimento com padrão internacional',
-    highlights: ['Especialidades Médicas', 'Apresentação do Corpo Clínico', 'Agendamento Prático'],
-    clientIndustry: 'Saúde & Cuidados Médicos',
-    accentColor: 'from-amber-500/20 to-cyan-500/10',
+      'Projeto premium para clínicas apresentarem serviços, especialidades e atendimento.',
+    fallbackImage: '',
+    tagline: 'Uma experiência premium para sua clínica.',
+    highlights: [
+      'Apresentação premium',
+      'Especialidades',
+      'Serviços',
+      'Profissionais',
+      'Contato',
+    ],
+    clientIndustry: 'Clínica',
+    accentColor: 'amber',
+    briefingType: 'Clínica',
+    structure: [
+      'Apresentação',
+      'Especialidades',
+      'Serviços',
+      'Profissionais',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'restaurante-premium',
     name: 'Restaurante Premium',
-    category: 'Gastronomia & Alta Culinária',
+    category: 'Restaurante',
     tier: 'Premium',
-    url: 'https://restaurante-premium-delta.vercel.app/',
+    url: '#',
     description:
-      'Experiência digital gastronômica que traduz o requinte autoral do restaurante. Cardápio sensorial ilustrado em alta resolução, carta de vinhos selecionados e reservas online.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Alta gastronomia com estética sensorial e reservas online',
-    highlights: ['Cardápio Sensorial Interativo', 'Reserva de Mesas', 'Carta de Vinhos'],
-    clientIndustry: 'Gastronomia & Hospitalidade',
-    accentColor: 'from-amber-500/20 to-yellow-600/10',
+      'Projeto premium para restaurantes apresentarem sua experiência, cardápio e identidade.',
+    fallbackImage: '',
+    tagline: 'Uma experiência premium para seu restaurante.',
+    highlights: [
+      'Experiência premium',
+      'Cardápio',
+      'Pratos',
+      'Ambiente',
+      'Contato',
+    ],
+    clientIndustry: 'Restaurante',
+    accentColor: 'amber',
+    briefingType: 'Restaurante',
+    structure: [
+      'Apresentação',
+      'Cardápio',
+      'Pratos em destaque',
+      'Ambiente',
+      'Informações',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
+
   {
     id: 'kings-barber-premium',
-    name: "King's Barber Premium",
-    category: 'Barbearia Premium & Estilo',
+    name: 'King’s Barber Premium',
+    category: 'Barbearia',
     tier: 'Premium',
-    url: 'https://king-s-barber-2-liard.vercel.app/',
+    url: '#',
     description:
-      'Ambiente digital refinado para barbearia de alto conceito e atendimento exclusivo. Destaca tratamentos masculinos personalizados, lounge bar e agendamento com barbeiros masters.',
-    fallbackImage:
-      'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1400&q=85',
-    tagline: 'Barbearia executiva com experiência premium para clientes',
-    highlights: ['Serviços Exclusivos', 'Agendamento com Mestres Barbeiros', 'Espaço Lounge'],
-    clientIndustry: 'Barbearia & Estilo',
-    accentColor: 'from-amber-500/20 to-stone-500/10',
+      'Projeto premium para barbearias apresentarem seus serviços, ambiente e identidade de forma sofisticada.',
+    fallbackImage: '',
+    tagline: 'Uma experiência premium para sua barbearia.',
+    highlights: [
+      'Experiência premium',
+      'Serviços',
+      'Ambiente',
+      'Diferenciais',
+      'Contato',
+    ],
+    clientIndustry: 'Barbearia',
+    accentColor: 'amber',
+    briefingType: 'Barbearia',
+    structure: [
+      'Apresentação',
+      'Serviços',
+      'Ambiente',
+      'Diferenciais',
+      'Galeria',
+      'Contato',
+    ],
+    plans: DEFAULT_PLANS,
   },
 ];
 
