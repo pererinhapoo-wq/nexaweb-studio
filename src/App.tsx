@@ -394,6 +394,116 @@ export default function App() {
             </div>
           </div>
         </section>
+                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ⚙️ COMO FUNCIONA
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section
+          id="como-funciona"
+          className="relative z-10 py-20 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60"
+        >
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Processo NexaWeb</span>
+            </div>
+
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
+              Como funciona
+            </h2>
+
+            <p className="text-sm sm:text-base text-neutral-300/90 leading-relaxed max-w-2xl mx-auto">
+              Criar seu site profissional pode ser simples. Escolha o serviço, envie suas informações e acompanhe o desenvolvimento do seu projeto.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-7">
+
+            {/* ETAPA 01 */}
+            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-3xl font-extrabold font-display text-blue-400">
+                  01
+                </span>
+
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-blue-400" />
+                </div>
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Escolha seu serviço
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Escolha entre Essencial, Profissional ou Personalizado.
+              </p>
+            </div>
+
+            {/* ETAPA 02 */}
+            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-3xl font-extrabold font-display text-emerald-400">
+                  02
+                </span>
+
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                </div>
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Envie seu briefing
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Conte para a NexaWeb sobre seu negócio, seus objetivos e o que você precisa.
+              </p>
+            </div>
+
+            {/* ETAPA 03 */}
+            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-3xl font-extrabold font-display text-purple-400">
+                  03
+                </span>
+
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-purple-400" />
+                </div>
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Receba o projeto
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                O projeto será desenvolvido de acordo com as informações do briefing.
+              </p>
+            </div>
+
+            {/* ETAPA 04 */}
+            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-3xl font-extrabold font-display text-amber-400">
+                  04
+                </span>
+
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-amber-400" />
+                </div>
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
+                Aprovação e publicação
+              </h3>
+
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Após a aprovação, o site segue para publicação.
+              </p>
+            </div>
+
+          </div>
+        </section>
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             🟦 CATEGORIA 1: PROJETOS ESSENCIAL (12 Cards)
