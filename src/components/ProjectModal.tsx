@@ -56,10 +56,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       : 'bg-blue-500/10 text-blue-300 border-blue-500/20';
 
   const handleBriefing = () => {
-    onClose();
-
     if (onOpenBriefing) {
-      onOpenBriefing(project.briefingType || project.clientIndustry || null);
+      onOpenBriefing(
+        project.briefingType || project.clientIndustry || null
+      );
     }
   };
 
