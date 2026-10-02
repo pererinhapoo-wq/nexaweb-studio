@@ -41,86 +41,93 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-neutral-950 shadow-md shadow-emerald-500/15 hover:brightness-105'
     : 'bg-gradient-to-r from-blue-500 via-sky-400 to-blue-500 text-neutral-950 shadow-md shadow-blue-500/15 hover:brightness-105';
 
-  const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
+  const isRealUrl = Boolean(project.url && project.url !== '#' && project.url.startsWith('http'));
 
   return (
     <article
-      className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl bg-neutral-900/90 border transition-all duration-300 overflow-hidden shadow-lg hover:shadow-xl hover:-translate-y-1 ${cardBorderClass}`}
+      className={`group relative flex flex-col justify-between h-full w-full rounded-2xl sm:rounded-3xl bg-neutral-900/90 border transition-all duration-300 overflow-hidden shadow-lg hover:shadow-xl ${cardBorderClass}`}
       aria-label={`Projeto ${project.name} - ${project.tier} NexaWeb`}
     >
-      <div>
-        {/* Cover / Image Showcase */}
-        <div className="relative aspect-[16/10] w-full">
-          <ProjectCardImage project={project} className="w-full h-full" priority={index < 3} />
+      <div className="flex flex-col flex-1">
+        {/* 1. Header: [badge/categoria] [status] */}
+        <div className="flex items-center justify-between px-3.5 sm:px-4 py-2 bg-neutral-950/90 border-b border-neutral-800/80 shrink-0">
+          <span className={`text-[10px] sm:text-[11px] font-bold tracking-wider uppercase ${categoryColorClass} truncate max-w-[60%]`}>
+            {project.category}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`w-1.5 h-1.5 rounded-full ${isRealUrl ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
+            <span className="text-[10px] sm:text-[11px] font-mono text-neutral-400">
+              {isRealUrl ? 'Site no Ar' : 'Demonstração'}
+            </span>
+            <span className="text-neutral-600 font-mono text-[9px] sm:text-[10px] ml-1">
+              #{String(index + 1).padStart(2, '0')}
+            </span>
+          </div>
+        </div>
 
-          {/* Tier badge indicator */}
-          <div className="absolute bottom-2.5 left-2.5 z-10">
+        {/* 2. Middle: [imagem/captura] */}
+        <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-[#08090C]">
+          <ProjectCardImage project={project} className="w-full h-full" priority={index < 3} />
+        </div>
+
+        {/* 3. Toolbar: [badge do plano] [Visão Geral] */}
+        <div className="flex items-center justify-between px-3.5 sm:px-4 py-2 bg-neutral-950/80 border-t border-b border-neutral-800/80 shrink-0">
+          <div className="flex items-center">
             {isPremium && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-amber-300 border border-amber-500/40 shadow-md">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-amber-500/10 text-amber-300 border border-amber-500/30">
                 <Sparkles className="w-3 h-3 text-amber-400" />
                 <span>Premium</span>
               </span>
             )}
             {isProfissional && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-emerald-300 border border-emerald-500/40 shadow-md">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
                 <Award className="w-3 h-3 text-emerald-400" />
                 <span>Profissional</span>
               </span>
             )}
             {!isPremium && !isProfissional && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-blue-300 border border-blue-500/40 shadow-md">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-300 border border-blue-500/30">
                 <Shield className="w-3 h-3 text-blue-400" />
                 <span>Essencial</span>
               </span>
             )}
           </div>
 
-          {/* Quick detail preview button */}
-          <div className="absolute bottom-2.5 right-2.5 z-10">
-            <button
-              type="button"
-              onClick={() => onPreview(project)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-neutral-950/85 hover:bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-700/60 shadow-sm transition-colors"
-              title="Ver detalhes do projeto"
-            >
-              <Eye className="w-3 h-3" />
-              <span>Visão Geral</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onPreview(project)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/60 transition-colors shadow-sm"
+            title="Ver detalhes do projeto"
+          >
+            <Eye className="w-3 h-3 text-amber-400" />
+            <span>Visão Geral</span>
+          </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-3.5 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
-          {/* Category & Index */}
-          <div className="flex items-center justify-between text-[10px] sm:text-[11px] tracking-wider uppercase font-semibold">
-            <span className={categoryColorClass}>{project.category}</span>
-            <span className="text-neutral-500 font-mono text-[9px] sm:text-[10px]">
-              #{String(index + 1).padStart(2, '0')}
-            </span>
-          </div>
-
+        {/* 4. Content Body - Standardized across all cards */}
+        <div className="p-3.5 sm:p-4 flex flex-col flex-1 gap-2">
           {/* Project Name */}
-          <h3 className="text-sm sm:text-base font-bold tracking-tight text-white font-display line-clamp-1 transition-colors group-hover:text-amber-200">
+          <h4 className="text-sm sm:text-base font-bold tracking-tight text-white font-display line-clamp-1 shrink-0 transition-colors group-hover:text-amber-200">
             {project.name}
-          </h3>
+          </h4>
 
-          {/* Description */}
-          <p className="text-neutral-300/85 text-[11px] sm:text-xs leading-relaxed line-clamp-2">
+          {/* Description - Fixed 2-line height so all cards align identically */}
+          <p className="text-neutral-300/85 text-[11px] sm:text-xs leading-relaxed line-clamp-2 h-[2.5rem] sm:h-[2.75rem] overflow-hidden shrink-0">
             {project.description}
           </p>
 
-          {/* Feature Highlights */}
-          <div className="pt-0.5 flex flex-wrap gap-1 sm:gap-1.5">
+          {/* Feature Highlights - Standardized single row of pills */}
+          <div className="flex flex-nowrap gap-1 sm:gap-1.5 h-[26px] overflow-hidden items-center shrink-0">
             {project.highlights.slice(0, 3).map((feat) => (
               <span
                 key={feat}
-                className="text-[10px] sm:text-[11px] text-neutral-300 bg-neutral-950/70 border border-neutral-800/80 rounded-md px-1.5 sm:px-2 py-0.5"
+                className="text-[10px] sm:text-[11px] text-neutral-300 bg-neutral-950/70 border border-neutral-800/80 rounded-md px-1.5 sm:px-2 py-0.5 whitespace-nowrap shrink-0 max-w-[140px] truncate"
               >
                 {feat}
               </span>
             ))}
             {project.highlights.length > 3 && (
-              <span className="text-[9px] sm:text-[10px] text-neutral-400 self-center">
+              <span className="text-[9px] sm:text-[10px] text-neutral-400 self-center whitespace-nowrap shrink-0">
                 +{project.highlights.length - 3}
               </span>
             )}
@@ -128,8 +135,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </div>
       </div>
 
-      {/* Card Actions Footer with "Quero um site deste formato", "Ver site no ar" and "Usar como inspiração" */}
-      <div className="p-3.5 sm:p-5 pt-0 flex flex-col gap-1.5 sm:gap-2 border-t border-neutral-800/60 mt-1 sm:mt-2">
+      {/* 5. Card Actions Footer with "Quero um site deste formato", "Ver site no ar" and "Usar como inspiração" */}
+      <div className="p-3.5 sm:p-4 pt-0 flex flex-col gap-1.5 sm:gap-2 border-t border-neutral-800/60 mt-auto shrink-0">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
           {/* Main Commercial Action: Quero um site deste formato */}
           <button

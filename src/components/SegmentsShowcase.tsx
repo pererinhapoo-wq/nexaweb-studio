@@ -555,7 +555,7 @@ const SegmentFeaturesExplorer: React.FC<SegmentFeaturesExplorerProps> = ({
                     </span>
                     <span className="text-[10px] font-mono text-neutral-500">WebSocket / Polling</span>
                   </div>
-                  <h5 className="text-xs sm:text-sm font-bold text-white">{feat.name}</h5>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">{feat.name}</h4>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">{feat.shortDesc}</p>
                 </div>
               );

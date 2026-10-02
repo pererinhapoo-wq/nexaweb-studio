@@ -793,6 +793,44 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       await uploadPhotos();
     }
 
+    try {
+      // Save submitted briefing to local storage so NexaWeb Admin can view and manage it
+      const savedBriefingsStr = localStorage.getItem('nexaweb_admin_briefings');
+      const existingBriefings = savedBriefingsStr ? JSON.parse(savedBriefingsStr) : [];
+      const newIdNumber = String(existingBriefings.length + 1).padStart(3, '0');
+      const now = new Date();
+      const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      const newBriefing = {
+        id: `BRF-${now.getFullYear()}-${newIdNumber}`,
+        clientName: clientName.trim() || 'Cliente NexaWeb',
+        businessName: businessName.trim() || 'Nova Empresa',
+        businessSegment: businessSegment.trim() || (selectedProject ? selectedProject.category : 'Geral'),
+        plan: activePlan,
+        date: formattedDate,
+        status: 'Novo',
+        clientPhone: clientPhone.trim() || 'Não informado',
+        clientEmail: clientEmail.trim() || 'Não informado',
+        notes: [
+          clientNotes.trim(),
+          customDescription.trim() ? `Visão do projeto: ${customDescription.trim()}` : '',
+          referenceUrl.trim() ? `Referência: ${referenceUrl.trim()}` : '',
+        ].filter(Boolean).join(' | '),
+        selectedFeatures: [
+          ...selectedSecoes.slice(0, 4),
+          ...selectedFuncionalidades.slice(0, 4),
+        ],
+        referenceModel: selectedProject ? selectedProject.name : undefined,
+        estimatedPrice: planData.price,
+        filesCount: photoFiles.length,
+      };
+
+      const updated = [newBriefing, ...existingBriefings];
+      localStorage.setItem('nexaweb_admin_briefings', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Storage briefing notice:', err);
+    }
+
     setSubmitted(true);
   };
 

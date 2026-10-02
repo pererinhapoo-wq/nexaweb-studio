@@ -29,6 +29,9 @@ const SHOWCASE_IDS = [
   'clinica-premium',
 ];
 
+// Module-level cache to remember already loaded banner captures across slide turns
+const bannerLoadedCache = new Set<string>();
+
 export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
   onSelectProject,
   onExplorePlans,
@@ -44,8 +47,32 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [hasBannerError, setHasBannerError] = useState(false);
+
+  // Helper to generate fast screenshot capture url
+  const getScreenshotUrl = useCallback((url: string) => {
+    if (!url || url === '#' || !url.startsWith('http')) return '';
+    return `https://s0.wp.com/mshots/v1/${encodeURIComponent(url)}?w=800&h=500`;
+  }, []);
+
+  const currentProject = showcaseProjects[currentIndex] || showcaseProjects[0];
+  const nextIndex = (currentIndex + 1) % showcaseProjects.length;
+  const nextProject = showcaseProjects[nextIndex];
+
+  const currentScreenshot = useMemo(
+    () => getScreenshotUrl(currentProject.url),
+    [currentProject.url, getScreenshotUrl]
+  );
+
+  const nextScreenshot = useMemo(
+    () => (nextProject ? getScreenshotUrl(nextProject.url) : ''),
+    [nextProject, getScreenshotUrl]
+  );
+
+  // Image display states: keep previous image visible until next one is ready
+  const [activeImageSrc, setActiveImageSrc] = useState<string>(() => currentScreenshot);
+  const [prevImageSrc, setPrevImageSrc] = useState<string>('');
+  const [isCrossFading, setIsCrossFading] = useState<boolean>(false);
+  const [hasBannerError, setHasBannerError] = useState<boolean>(false);
 
   // IntersectionObserver: Pause heavy timers and preloads when banner is scrolled out of viewport
   useEffect(() => {
@@ -64,45 +91,83 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const currentProject = showcaseProjects[currentIndex] || showcaseProjects[0];
-  const nextIndex = (currentIndex + 1) % showcaseProjects.length;
-  const nextProject = showcaseProjects[nextIndex];
-
-  const getScreenshotUrl = (url: string) => {
-    if (!url || url === '#' || !url.startsWith('http')) return '';
-    return `https://s0.wp.com/mshots/v1/${encodeURIComponent(url)}?w=900&h=560`;
-  };
-
-  const currentScreenshot = useMemo(
-    () => getScreenshotUrl(currentProject.url),
-    [currentProject.url]
-  );
-  const nextScreenshot = useMemo(
-    () => getScreenshotUrl(nextProject.url),
-    [nextProject.url]
-  );
-
-  // Preload NEXT image only when banner is in viewport (avoids background requests during scroll)
+  // When currentIndex changes, prepare transition without flashing a loading screen
   useEffect(() => {
-    setImageLoaded(false);
-    setHasBannerError(false);
-    if (nextScreenshot && isInViewport) {
-      const img = new Image();
-      img.src = nextScreenshot;
+    if (!currentScreenshot) {
+      setHasBannerError(true);
+      return;
     }
-  }, [nextScreenshot, currentIndex, isInViewport]);
+
+    setHasBannerError(false);
+
+    // If the image is already cached, switch immediately
+    if (bannerLoadedCache.has(currentScreenshot)) {
+      setPrevImageSrc(activeImageSrc);
+      setActiveImageSrc(currentScreenshot);
+      setIsCrossFading(false);
+      return;
+    }
+
+    // Otherwise, keep current image visible while loading the new one in background
+    let isCancelled = false;
+    const img = new Image();
+    img.src = currentScreenshot;
+
+    img.onload = () => {
+      if (isCancelled) return;
+      bannerLoadedCache.add(currentScreenshot);
+      setPrevImageSrc(activeImageSrc);
+      setActiveImageSrc(currentScreenshot);
+      setIsCrossFading(true);
+      setTimeout(() => setIsCrossFading(false), 400);
+    };
+
+    img.onerror = () => {
+      if (isCancelled) return;
+      // Try fallback image if configured
+      if (currentProject.fallbackImage) {
+        setActiveImageSrc(currentProject.fallbackImage);
+      } else {
+        setHasBannerError(true);
+      }
+    };
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentIndex, currentScreenshot, currentProject.fallbackImage]);
+
+  // Preload ONLY the next slide when banner is in viewport
+  useEffect(() => {
+    if (!nextScreenshot || !isInViewport) return;
+    if (bannerLoadedCache.has(nextScreenshot)) return;
+
+    const nextImg = new Image();
+    nextImg.src = nextScreenshot;
+    nextImg.onload = () => {
+      bannerLoadedCache.add(nextScreenshot);
+    };
+  }, [nextScreenshot, isInViewport]);
+
+  // Track user manual changes to restart auto-timer from 0
+  const [slideVersion, setSlideVersion] = useState(0);
+
+  const handleSelectSlide = (idx: number) => {
+    setCurrentIndex(idx);
+    setSlideVersion((v) => v + 1);
+  };
 
   // Handle slide step
   const handleNext = useCallback(() => {
-    setImageLoaded(false);
     setCurrentIndex((prev) => (prev + 1) % showcaseProjects.length);
+    setSlideVersion((v) => v + 1);
   }, [showcaseProjects.length]);
 
   const handlePrev = useCallback(() => {
-    setImageLoaded(false);
     setCurrentIndex((prev) =>
       prev === 0 ? showcaseProjects.length - 1 : prev - 1
     );
+    setSlideVersion((v) => v + 1);
   }, [showcaseProjects.length]);
 
   // Auto transition every 4.5 seconds only if not paused and visible in viewport
@@ -110,11 +175,11 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
     if (isPaused || !isInViewport) return;
 
     const timer = setInterval(() => {
-      handleNext();
+      setCurrentIndex((prev) => (prev + 1) % showcaseProjects.length);
     }, 4500);
 
     return () => clearInterval(timer);
-  }, [isPaused, isInViewport, handleNext]);
+  }, [isPaused, isInViewport, showcaseProjects.length, slideVersion]);
 
   const tierBadge = useMemo(() => {
     if (currentProject.tier === 'Premium') {
@@ -155,37 +220,47 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
       onTouchStart={() => setIsPaused(true)}
       onTouchEnd={() => setIsPaused(false)}
     >
-      {/* Top subtle highlight banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 sm:py-3 border-b border-neutral-800/80 bg-neutral-950/70 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-semibold text-neutral-300 text-xs">
-            Showcase de Projetos Publicados
-          </span>
-          <span className="text-neutral-500 hidden sm:inline">·</span>
-          <span className="text-neutral-400 hidden sm:inline text-xs">
-            Demonstrações reais no ar
-          </span>
-        </div>
+      {/* Top subtle highlight banner & indicator bar */}
+      <div className="relative z-20 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-neutral-800/80 bg-neutral-950/85">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="font-semibold text-neutral-200 text-xs">
+              Showcase de Projetos Publicados
+            </span>
+            <span className="text-neutral-600 hidden sm:inline">·</span>
+            <span className="text-neutral-400 hidden sm:inline text-xs">
+              Demonstrações reais no ar
+            </span>
+          </div>
 
-        {/* Progress Dots */}
-        <div className="flex items-center gap-1.5">
-          {showcaseProjects.map((p, idx) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                setImageLoaded(false);
-                setCurrentIndex(idx);
-              }}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                idx === currentIndex
-                  ? 'w-6 bg-amber-400'
-                  : 'w-2 bg-neutral-700 hover:bg-neutral-500'
-              }`}
-              aria-label={`Ver slide ${p.name}`}
-            />
-          ))}
+          {/* Progress Indicators Bar with accessible ~44x44px touch targets */}
+          <nav
+            aria-label="Projetos em destaque no showcase"
+            className="w-full sm:w-auto flex items-center justify-center flex-nowrap"
+          >
+            {showcaseProjects.map((p, idx) => {
+              const isActive = idx === currentIndex;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectSlide(idx)}
+                  className="flex-1 sm:flex-initial max-w-[44px] min-w-[36px] sm:w-11 h-11 flex items-center justify-center p-0 m-0 shrink-0 touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg group cursor-pointer"
+                  aria-label={`Ver slide do projeto ${idx + 1} de ${showcaseProjects.length}: ${p.name}`}
+                  aria-current={isActive ? 'true' : undefined}
+                >
+                  <span
+                    className={`rounded-full transition-all duration-300 pointer-events-none block ${
+                      isActive
+                        ? 'w-7 sm:w-8 h-2 bg-gradient-to-r from-amber-400 to-amber-500 shadow-md shadow-amber-400/50 ring-1 ring-amber-300/80'
+                        : 'w-2.5 sm:w-3 h-2 bg-neutral-500 group-hover:bg-neutral-300'
+                    }`}
+                  />
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
@@ -206,9 +281,9 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
           </div>
 
           <div>
-            <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold font-display text-white tracking-tight leading-snug">
+            <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold font-display text-white tracking-tight leading-snug">
               {currentProject.name}
-            </h3>
+            </h2>
             <p className="mt-1 text-xs sm:text-sm font-medium text-amber-300/90">
               {currentProject.tagline || 'Presença digital profissional e responsiva.'}
             </p>
@@ -237,7 +312,7 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
                 href={currentProject.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-h-[42px] sm:min-h-[44px] flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-400/15 active:scale-[0.98] transition-all"
+                className="min-h-[44px] flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-400/15 active:scale-[0.98] transition-all"
               >
                 <span>Ver projeto ao vivo</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -253,33 +328,37 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
                   onSelectProject(currentProject);
                 }
               }}
-              className="min-h-[42px] sm:min-h-[44px] flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 text-xs sm:text-sm font-semibold transition-colors active:scale-[0.98]"
+              className="min-h-[44px] flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 text-xs sm:text-sm font-semibold transition-colors active:scale-[0.98]"
             >
               <span>Escolher plano</span>
             </button>
           </div>
 
-          {/* Slide Navigation arrows & quick index */}
+          {/* Slide Navigation arrows with >= 44x44px touch targets */}
           <div className="pt-1 flex items-center justify-between text-xs text-neutral-500">
             <span>
               Projeto {currentIndex + 1} de {showcaseProjects.length}
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={handlePrev}
-                className="w-8 h-8 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-colors"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-300 hover:text-white"
                 aria-label="Projeto anterior"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <span className="w-8 h-8 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 flex items-center justify-center transition-colors">
+                  <ChevronLeft className="w-4 h-4" />
+                </span>
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                className="w-8 h-8 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-colors"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-300 hover:text-white"
                 aria-label="Próximo projeto"
               >
-                <ChevronRight className="w-4 h-4" />
+                <span className="w-8 h-8 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 flex items-center justify-center transition-colors">
+                  <ChevronRight className="w-4 h-4" />
+                </span>
               </button>
             </div>
           </div>
@@ -307,37 +386,43 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
               </div>
             </div>
 
-            {/* Screen Content - Object contain to prevent crop */}
+            {/* Screen Content - Smooth crossfade, zero flashing loader during normal autoplay */}
             <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg bg-neutral-950 mt-2">
-              {currentScreenshot && !hasBannerError ? (
-                <>
+              {activeImageSrc && !hasBannerError ? (
+                <div className="relative w-full h-full">
+                  {/* Previous image layer keeps previous slide visible while cross-fading */}
+                  {prevImageSrc && prevImageSrc !== activeImageSrc && (
+                    <img
+                      src={prevImageSrc}
+                      alt=""
+                      aria-hidden="true"
+                      width={800}
+                      height={500}
+                      className="absolute inset-0 w-full h-full object-contain object-top"
+                    />
+                  )}
+
+                  {/* Active current image */}
                   <img
-                    key={currentProject.id}
-                    src={currentScreenshot}
+                    key={activeImageSrc}
+                    src={activeImageSrc}
                     alt={`Prévia do projeto ${currentProject.name}`}
-                    loading="lazy"
+                    width={800}
+                    height={500}
+                    loading="eager"
+                    fetchPriority="high"
                     decoding="async"
-                    onLoad={() => setImageLoaded(true)}
-                    onError={() => setHasBannerError(true)}
-                    className={`w-full h-full object-contain object-top transition-opacity duration-300 ${
-                      imageLoaded ? 'opacity-100' : 'opacity-0'
+                    className={`relative z-10 w-full h-full object-contain object-top transition-opacity duration-300 ${
+                      isCrossFading ? 'opacity-90' : 'opacity-100'
                     }`}
                   />
-                  {!imageLoaded && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950">
-                      <div className="w-7 h-7 rounded-full border-2 border-neutral-700 border-t-amber-400 animate-spin mb-2" />
-                      <span className="text-xs font-mono text-neutral-500">
-                        Carregando {currentProject.name}...
-                      </span>
-                    </div>
-                  )}
-                </>
+                </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-neutral-900 to-neutral-950">
                   <Sparkles className="w-8 h-8 text-amber-400 mb-2" />
-                  <h4 className="text-base sm:text-lg font-bold text-white font-display">
+                  <h3 className="text-base sm:text-lg font-bold text-white font-display">
                     {currentProject.name}
-                  </h4>
+                  </h3>
                   <p className="text-xs text-neutral-400 mt-1 max-w-sm">
                     {currentProject.description}
                   </p>
@@ -366,3 +451,4 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
     </div>
   );
 };
+

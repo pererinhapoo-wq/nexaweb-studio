@@ -24,22 +24,34 @@ import {
 } from './data/projects';
 import { ProjectCard } from './components/ProjectCard';
 import { ProjectCarouselSection } from './components/ProjectCarouselSection';
-import { ProjectModal } from './components/ProjectModal';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
-import {
-  ContactModal,
-  type ServiceLevelType,
-  type ModelIntentType,
-  type BriefingStage,
+import type {
+  ServiceLevelType,
+  ModelIntentType,
+  BriefingStage,
 } from './components/ContactModal';
 import { ShowcaseBanner } from './components/ShowcaseBanner';
 import { PlansSection } from './components/PlansSection';
-import { PlanAdvisorModal } from './components/PlanAdvisorModal';
-import { StartProjectModal } from './components/StartProjectModal';
 import { SegmentsShowcase } from './components/SegmentsShowcase';
-import { AdminDashboard } from './components/AdminDashboard';
 import type { PlanId } from './components/PlanDetailModal';
+
+// Code-split heavy modals and administration views so they do not load on first paint
+const AdminDashboard = React.lazy(() =>
+  import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+const ContactModal = React.lazy(() =>
+  import('./components/ContactModal').then((m) => ({ default: m.ContactModal }))
+);
+const ProjectModal = React.lazy(() =>
+  import('./components/ProjectModal').then((m) => ({ default: m.ProjectModal }))
+);
+const PlanAdvisorModal = React.lazy(() =>
+  import('./components/PlanAdvisorModal').then((m) => ({ default: m.PlanAdvisorModal }))
+);
+const StartProjectModal = React.lazy(() =>
+  import('./components/StartProjectModal').then((m) => ({ default: m.StartProjectModal }))
+);
 
 export default function App() {
   const [isAdminView, setIsAdminView] = useState<boolean>(() => {
@@ -215,16 +227,24 @@ export default function App() {
 
   if (isAdminView) {
     return (
-      <AdminDashboard
-        onBackToSite={() => {
-          setIsAdminView(false);
-          if (window.location.hash === '#admin') {
-            window.history.pushState(null, '', window.location.pathname);
-          } else if (window.location.pathname === '/admin') {
-            window.history.pushState(null, '', '/');
-          }
-        }}
-      />
+      <React.Suspense
+        fallback={
+          <div className="min-h-screen bg-[#08090C] flex items-center justify-center text-neutral-400 text-xs">
+            Carregando painel...
+          </div>
+        }
+      >
+        <AdminDashboard
+          onBackToSite={() => {
+            setIsAdminView(false);
+            if (window.location.hash === '#admin') {
+              window.history.pushState(null, '', window.location.pathname);
+            } else if (window.location.pathname === '/admin') {
+              window.history.pushState(null, '', '/');
+            }
+          }}
+        />
+      </React.Suspense>
     );
   }
 
@@ -235,6 +255,12 @@ export default function App() {
         onOpenContact={handleOpenBriefing}
         onOpenAdvisor={() => setAdvisorModalOpen(true)}
         onStartProject={() => setStartModalOpen(true)}
+        onOpenAdmin={() => {
+          if (window.location.pathname !== '/admin') {
+            window.history.pushState(null, '', '/admin');
+          }
+          setIsAdminView(true);
+        }}
       />
 
       {/* Main Content */}
@@ -769,70 +795,86 @@ export default function App() {
       <Footer onOpenAdmin={() => setIsAdminView(true)} />
 
       {/* Project Inspector Modal */}
-      <ProjectModal
-        project={activeProject}
-        onClose={() => setActiveProject(null)}
-        onOpenBriefing={handleOpenBriefing}
-        onSelectPlan={handleSelectPlan}
-        onSelectFormat={(proj) => {
-          setActiveProject(null);
-          handleSelectFormat(proj);
-        }}
-        onUseAsInspiration={(proj) => {
-          setActiveProject(null);
-          handleUseAsInspiration(proj);
-        }}
-      />
+      {activeProject && (
+        <React.Suspense fallback={null}>
+          <ProjectModal
+            project={activeProject}
+            onClose={() => setActiveProject(null)}
+            onOpenBriefing={handleOpenBriefing}
+            onSelectPlan={handleSelectPlan}
+            onSelectFormat={(proj) => {
+              setActiveProject(null);
+              handleSelectFormat(proj);
+            }}
+            onUseAsInspiration={(proj) => {
+              setActiveProject(null);
+              handleUseAsInspiration(proj);
+            }}
+          />
+        </React.Suspense>
+      )}
 
       {/* Centralized Briefing & Commercial Flow Modal */}
-      <ContactModal
-        isOpen={contactModalOpen}
-        onClose={() => {
-          setContactModalOpen(false);
-          setSelectedServiceLevel(null);
-          setSelectedBriefingType(null);
-          setSelectedProjectForBriefing(null);
-          setSelectedInitialIntent(null);
-          setSelectedInitialDescription('');
-          setActiveProject(null);
-        }}
-        onBack={() => {
-          setContactModalOpen(false);
-          setSelectedProjectForBriefing(null);
-          setSelectedInitialIntent(null);
-          setSelectedInitialDescription('');
-        }}
-        serviceLevel={selectedServiceLevel}
-        briefingType={selectedBriefingType}
-        selectedProject={selectedProjectForBriefing}
-        initialIntent={selectedInitialIntent}
-        initialDescription={selectedInitialDescription}
-        initialStage={modalInitialStage}
-      />
+      {contactModalOpen && (
+        <React.Suspense fallback={null}>
+          <ContactModal
+            isOpen={contactModalOpen}
+            onClose={() => {
+              setContactModalOpen(false);
+              setSelectedServiceLevel(null);
+              setSelectedBriefingType(null);
+              setSelectedProjectForBriefing(null);
+              setSelectedInitialIntent(null);
+              setSelectedInitialDescription('');
+              setActiveProject(null);
+            }}
+            onBack={() => {
+              setContactModalOpen(false);
+              setSelectedProjectForBriefing(null);
+              setSelectedInitialIntent(null);
+              setSelectedInitialDescription('');
+            }}
+            serviceLevel={selectedServiceLevel}
+            briefingType={selectedBriefingType}
+            selectedProject={selectedProjectForBriefing}
+            initialIntent={selectedInitialIntent}
+            initialDescription={selectedInitialDescription}
+            initialStage={modalInitialStage}
+          />
+        </React.Suspense>
+      )}
 
       {/* Plan Advisor Wizard Modal */}
-      <PlanAdvisorModal
-        isOpen={advisorModalOpen}
-        onClose={() => setAdvisorModalOpen(false)}
-        onSelectPlan={handleSelectPlan}
-      />
+      {advisorModalOpen && (
+        <React.Suspense fallback={null}>
+          <PlanAdvisorModal
+            isOpen={advisorModalOpen}
+            onClose={() => setAdvisorModalOpen(false)}
+            onSelectPlan={handleSelectPlan}
+          />
+        </React.Suspense>
+      )}
 
       {/* Start Project ("Criar meu site") Modal */}
-      <StartProjectModal
-        isOpen={startModalOpen}
-        onClose={() => setStartModalOpen(false)}
-        onChooseSample={() => {
-          const element = document.getElementById('modelos');
-          element?.scrollIntoView({ behavior: 'smooth' });
-        }}
-        onChooseCustomIdea={() => {
-          handleStartCustomIdea();
-        }}
-        onChoosePlanDirectly={() => {
-          const element = document.getElementById('planos');
-          element?.scrollIntoView({ behavior: 'smooth' });
-        }}
-      />
+      {startModalOpen && (
+        <React.Suspense fallback={null}>
+          <StartProjectModal
+            isOpen={startModalOpen}
+            onClose={() => setStartModalOpen(false)}
+            onChooseSample={() => {
+              const element = document.getElementById('modelos');
+              element?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            onChooseCustomIdea={() => {
+              handleStartCustomIdea();
+            }}
+            onChoosePlanDirectly={() => {
+              const element = document.getElementById('planos');
+              element?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

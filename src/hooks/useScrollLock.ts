@@ -33,6 +33,23 @@ function getEffectiveScrollY(): number {
   );
 }
 
+// Intercept gestures outside scrollable containers to strictly isolate background scroll on mobile and desktop
+function preventGestureIfLocked(e: TouchEvent | WheelEvent) {
+  let target = e.target as HTMLElement | null;
+  while (target && target !== document.body && target !== document.documentElement) {
+    const overflowY = window.getComputedStyle(target).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      // Element is an active scroll container (e.g. drawer or modal body)
+      return;
+    }
+    target = target.parentElement;
+  }
+  // Target is on background/backdrop/static element -> prevent movement
+  if (e.cancelable) {
+    e.preventDefault();
+  }
+}
+
 export function lockScroll() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
@@ -78,6 +95,10 @@ export function lockScroll() {
     if (scrollbarWidth > 0) {
       document.body.style.paddingRight = `${scrollbarWidth}px`;
     }
+
+    // Add active touchmove and wheel blockers for backdrop and background elements
+    window.addEventListener('touchmove', preventGestureIfLocked, { passive: false });
+    window.addEventListener('wheel', preventGestureIfLocked, { passive: false });
   }
 }
 
@@ -89,6 +110,10 @@ export function unlockScroll() {
   }
 
   if (lockCount === 0) {
+    // Remove active gesture blockers
+    window.removeEventListener('touchmove', preventGestureIfLocked);
+    window.removeEventListener('wheel', preventGestureIfLocked);
+
     // Debounce the unlock by one animation frame to allow another modal to mount without unlocking/flickering
     if (unlockTimeoutId !== null) {
       cancelAnimationFrame(unlockTimeoutId);
@@ -117,9 +142,6 @@ export function unlockScroll() {
         document.body.style.paddingRight = originalBodyStyles.paddingRight || '';
         originalBodyStyles = null;
 
-        // Force layout reflow before scrolling so document height is acknowledged after position:fixed removal
-        void document.documentElement.offsetHeight;
-
         // Restore scroll position instantly without jumping to top
         const targetScrollY = savedScrollY;
 
@@ -130,20 +152,8 @@ export function unlockScroll() {
         document.documentElement.scrollTop = targetScrollY;
         document.body.scrollTop = targetScrollY;
 
-        // Re-enable original scroll behavior after DOM layout has settled and verify scroll
+        // Re-enable original scroll behavior after layout has settled
         requestAnimationFrame(() => {
-          if (targetScrollY > 0) {
-            const currentActualY =
-              window.pageYOffset ||
-              document.documentElement.scrollTop ||
-              document.body.scrollTop ||
-              0;
-            if (Math.abs(currentActualY - targetScrollY) > 5) {
-              window.scrollTo(0, targetScrollY);
-              document.documentElement.scrollTop = targetScrollY;
-              document.body.scrollTop = targetScrollY;
-            }
-          }
           document.documentElement.style.scrollBehavior = prevHtmlScrollBehavior;
           document.body.style.scrollBehavior = prevBodyScrollBehavior;
         });

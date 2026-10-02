@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import {
   Shield,
   Sliders,
@@ -10,9 +10,15 @@ import {
   HelpCircle,
   Eye,
 } from 'lucide-react';
-import type { PlanId } from './PlanDetailModal';
-import { PlanDetailModal, PLANS_DATA } from './PlanDetailModal';
-import { PlanAdvisorModal } from './PlanAdvisorModal';
+import type { PlanId } from '../data/plans';
+import { PLANS_DATA } from '../data/plans';
+
+const PlanDetailModal = lazy(() =>
+  import('./PlanDetailModal').then((m) => ({ default: m.PlanDetailModal }))
+);
+const PlanAdvisorModal = lazy(() =>
+  import('./PlanAdvisorModal').then((m) => ({ default: m.PlanAdvisorModal }))
+);
 
 interface PlansSectionProps {
   onSelectPlan: (planId: PlanId, startAtBriefing?: boolean) => void;
@@ -176,24 +182,32 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
       </div>
 
       {/* Plan Details Presentation Modal */}
-      <PlanDetailModal
-        planId={detailModalPlan}
-        onClose={() => setDetailModalPlan(null)}
-        onSelectPlan={(id) => {
-          setDetailModalPlan(null);
-          onSelectPlan(id, true);
-        }}
-      />
+      {detailModalPlan && (
+        <Suspense fallback={null}>
+          <PlanDetailModal
+            planId={detailModalPlan}
+            onClose={() => setDetailModalPlan(null)}
+            onSelectPlan={(id) => {
+              setDetailModalPlan(null);
+              onSelectPlan(id, true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Guided Advisor Modal */}
-      <PlanAdvisorModal
-        isOpen={advisorModalOpen}
-        onClose={() => setAdvisorModalOpen(false)}
-        onSelectPlan={(id) => {
-          setAdvisorModalOpen(false);
-          onSelectPlan(id);
-        }}
-      />
+      {advisorModalOpen && (
+        <Suspense fallback={null}>
+          <PlanAdvisorModal
+            isOpen={advisorModalOpen}
+            onClose={() => setAdvisorModalOpen(false)}
+            onSelectPlan={(id) => {
+              setAdvisorModalOpen(false);
+              onSelectPlan(id);
+            }}
+          />
+        </Suspense>
+      )}
     </section>
   );
 };

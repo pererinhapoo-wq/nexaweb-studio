@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Shield,
   Layers,
@@ -23,6 +23,10 @@ import {
   Mail,
   Calendar,
   Building,
+  Download,
+  Plus,
+  Trash2,
+  MessageCircle,
 } from 'lucide-react';
 import {
   ALL_PROJECTS,
@@ -143,8 +147,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
 
   const [selectedBriefing, setSelectedBriefing] = useState<AdminBriefingItem | null>(null);
   const [briefingFilter, setBriefingFilter] = useState<string>('todos');
+  const [briefingSearch, setBriefingSearch] = useState<string>('');
+  const [isNewBriefingModalOpen, setIsNewBriefingModalOpen] = useState<boolean>(false);
   const [demoFilter, setDemoFilter] = useState<'todos' | 'publicados' | 'conceito'>('todos');
   const [demoSearch, setDemoSearch] = useState<string>('');
+
+  // Form state for creating a manual briefing inside the admin
+  const [newForm, setNewForm] = useState({
+    clientName: '',
+    businessName: '',
+    businessSegment: '',
+    plan: 'Essencial' as 'Essencial' | 'Personalizado' | 'Profissional' | 'Premium',
+    clientPhone: '',
+    clientEmail: '',
+    notes: '',
+    estimatedPrice: 'R$ 690',
+  });
+
+  // Synchronize localStorage updates automatically
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const saved = localStorage.getItem('nexaweb_admin_briefings');
+        if (saved) setBriefings(JSON.parse(saved));
+      } catch (e) {
+        console.warn('Storage sync notice:', e);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const handleUpdateStatus = (id: string, newStatus: BriefingStatus) => {
     const updated = briefings.map((b) => (b.id === id ? { ...b, status: newStatus } : b));
@@ -159,10 +191,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
     }
   };
 
+  const handleDeleteBriefing = (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este briefing do painel?')) return;
+    const updated = briefings.filter((b) => b.id !== id);
+    setBriefings(updated);
+    if (selectedBriefing?.id === id) {
+      setSelectedBriefing(null);
+    }
+    try {
+      localStorage.setItem('nexaweb_admin_briefings', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Delete storage notice:', e);
+    }
+  };
+
+  const handleExportBriefings = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(briefings, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `nexaweb-briefings-${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleCreateManualBriefing = (e: React.FormEvent) => {
+    e.preventDefault();
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const newId = `BRF-${now.getFullYear()}-${String(briefings.length + 1).padStart(3, '0')}`;
+
+    const item: AdminBriefingItem = {
+      id: newId,
+      clientName: newForm.clientName.trim() || 'Lead NexaWeb',
+      businessName: newForm.businessName.trim() || 'Novo Negócio',
+      businessSegment: newForm.businessSegment.trim() || 'Comercial',
+      plan: newForm.plan,
+      date: formattedDate,
+      status: 'Novo',
+      clientPhone: newForm.clientPhone.trim() || 'Não informado',
+      clientEmail: newForm.clientEmail.trim() || 'Não informado',
+      notes: newForm.notes.trim() || undefined,
+      estimatedPrice: newForm.estimatedPrice || (newForm.plan === 'Essencial' ? 'R$ 690' : newForm.plan === 'Profissional' ? 'R$ 1.700' : 'Sob consulta'),
+      filesCount: 0,
+    };
+
+    const updated = [item, ...briefings];
+    setBriefings(updated);
+    try {
+      localStorage.setItem('nexaweb_admin_briefings', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Storage save notice:', err);
+    }
+
+    setIsNewBriefingModalOpen(false);
+    setNewForm({
+      clientName: '',
+      businessName: '',
+      businessSegment: '',
+      plan: 'Essencial',
+      clientPhone: '',
+      clientEmail: '',
+      notes: '',
+      estimatedPrice: 'R$ 690',
+    });
+  };
+
   const filteredBriefings = useMemo(() => {
-    if (briefingFilter === 'todos') return briefings;
-    return briefings.filter((b) => b.status === briefingFilter);
-  }, [briefings, briefingFilter]);
+    return briefings.filter((b) => {
+      if (briefingFilter !== 'todos' && b.status !== briefingFilter) return false;
+      if (!briefingSearch.trim()) return true;
+      const q = briefingSearch.toLowerCase();
+      return (
+        b.clientName.toLowerCase().includes(q) ||
+        b.businessName.toLowerCase().includes(q) ||
+        b.businessSegment.toLowerCase().includes(q) ||
+        b.clientPhone.includes(q) ||
+        b.id.toLowerCase().includes(q)
+      );
+    });
+  }, [briefings, briefingFilter, briefingSearch]);
 
   const filteredDemos = useMemo(() => {
     return ALL_PROJECTS.filter((p) => {
@@ -400,98 +508,169 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
         {/* TAB 2: GERENCIAMENTO DE BRIEFINGS */}
         {activeTab === 'briefings' && (
           <div className="space-y-5 animate-fadeIn">
-            {/* Filter pills */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-                {(['todos', 'Novo', 'Em análise', 'Em desenvolvimento', 'Aguardando cliente', 'Concluído'] as const).map(
-                  (st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setBriefingFilter(st)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
-                        briefingFilter === st
-                          ? 'bg-amber-400 text-neutral-950 font-bold'
-                          : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  )
-                )}
+            {/* Action Bar: Search, Filters & Action Buttons */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="relative flex-1 sm:max-w-xs">
+                  <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={briefingSearch}
+                    onChange={(e) => setBriefingSearch(e.target.value)}
+                    placeholder="Buscar por cliente, empresa ou telefone..."
+                    className="w-full h-9 pl-9 pr-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-500 outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportBriefings}
+                    className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    title="Exportar todos os briefings em formato JSON"
+                  >
+                    <Download className="w-3.5 h-3.5 text-neutral-400" />
+                    <span>Exportar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsNewBriefingModalOpen(true)}
+                    className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-md shadow-amber-400/15"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Novo Briefing</span>
+                  </button>
+                </div>
               </div>
-              <span className="text-xs text-neutral-500">
-                {filteredBriefings.length} briefing(s) encontrado(s)
-              </span>
+
+              {/* Status Filter Pills */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                  {(['todos', 'Novo', 'Em análise', 'Em desenvolvimento', 'Aguardando cliente', 'Concluído'] as const).map(
+                    (st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setBriefingFilter(st)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+                          briefingFilter === st
+                            ? 'bg-amber-400 text-neutral-950 font-bold'
+                            : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    )
+                  )}
+                </div>
+                <span className="text-xs text-neutral-500">
+                  {filteredBriefings.length} briefing(s) encontrado(s)
+                </span>
+              </div>
             </div>
 
             {/* Briefings List */}
             <div className="grid grid-cols-1 gap-3">
-              {filteredBriefings.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="text-xs font-mono font-bold text-amber-400">{item.id}</span>
-                      <h4 className="text-base font-bold text-white">{item.clientName}</h4>
-                      <span className="text-xs text-neutral-400">({item.businessName})</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(item.status)}`}>
-                        {item.status}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400">
-                      <span className="inline-flex items-center gap-1 text-neutral-300">
-                        <Building className="w-3.5 h-3.5 text-neutral-500" />
-                        {item.businessSegment}
-                      </span>
-                      <span>·</span>
-                      <span className="text-white font-semibold">Plano {item.plan}</span>
-                      <span>·</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5 text-neutral-500" />
-                        {item.clientPhone}
-                      </span>
-                      <span>·</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-neutral-500" />
-                        {item.date}
-                      </span>
-                    </div>
-
-                    {item.notes && (
-                      <p className="text-xs text-neutral-400 italic bg-neutral-950/60 p-2 rounded-lg border border-neutral-800/80 max-w-2xl">
-                        "{item.notes}"
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions & Status Dropdown */}
-                  <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                    <select
-                      value={item.status}
-                      onChange={(e) => handleUpdateStatus(item.id, e.target.value as BriefingStatus)}
-                      className="px-3 py-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-200 outline-none focus:border-amber-400"
-                    >
-                      <option value="Novo">Novo</option>
-                      <option value="Em análise">Em análise</option>
-                      <option value="Em desenvolvimento">Em desenvolvimento</option>
-                      <option value="Aguardando cliente">Aguardando cliente</option>
-                      <option value="Concluído">Concluído</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBriefing(item)}
-                      className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 hover:text-white transition-colors"
-                    >
-                      Detalhes
-                    </button>
-                  </div>
+              {filteredBriefings.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-2">
+                  <FileText className="w-8 h-8 text-neutral-600 mx-auto" />
+                  <p className="text-sm font-semibold text-neutral-300">Nenhum briefing encontrado</p>
+                  <p className="text-xs text-neutral-500">
+                    Ajuste os filtros ou cadastre um novo briefing manualmente.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                filteredBriefings.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-xs font-mono font-bold text-amber-400">{item.id}</span>
+                        <h4 className="text-base font-bold text-white">{item.clientName}</h4>
+                        <span className="text-xs text-neutral-400">({item.businessName})</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(item.status)}`}>
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400">
+                        <span className="inline-flex items-center gap-1 text-neutral-300">
+                          <Building className="w-3.5 h-3.5 text-neutral-500" />
+                          {item.businessSegment}
+                        </span>
+                        <span>·</span>
+                        <span className="text-white font-semibold">Plano {item.plan}</span>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-neutral-500" />
+                          {item.clientPhone}
+                        </span>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-neutral-500" />
+                          {item.date}
+                        </span>
+                      </div>
+
+                      {item.notes && (
+                        <p className="text-xs text-neutral-400 italic bg-neutral-950/60 p-2 rounded-lg border border-neutral-800/80 max-w-2xl">
+                          "{item.notes}"
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions & Status Dropdown */}
+                    <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
+                      {item.clientPhone && item.clientPhone !== 'Não informado' && (
+                        <a
+                          href={`https://wa.me/55${item.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Olá ${item.clientName}, tudo bem? Aqui é da equipe NexaWeb referente ao seu briefing para a ${item.businessName}!`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="h-8 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                          title="Abrir WhatsApp com cliente"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">WhatsApp</span>
+                        </a>
+                      )}
+
+                      <select
+                        value={item.status}
+                        onChange={(e) => handleUpdateStatus(item.id, e.target.value as BriefingStatus)}
+                        className="h-8 px-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-200 outline-none focus:border-amber-400"
+                      >
+                        <option value="Novo">Novo</option>
+                        <option value="Em análise">Em análise</option>
+                        <option value="Em desenvolvimento">Em desenvolvimento</option>
+                        <option value="Aguardando cliente">Aguardando cliente</option>
+                        <option value="Concluído">Concluído</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBriefing(item)}
+                        className="h-8 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 hover:text-white transition-colors"
+                      >
+                        Detalhes
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBriefing(item.id)}
+                        className="h-8 w-8 rounded-xl bg-neutral-950 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-neutral-800 flex items-center justify-center transition-colors"
+                        title="Excluir briefing"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -784,11 +963,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
-                <span className="text-neutral-500 block text-[10px]">CONTATOS</span>
-                <div className="flex items-center justify-between">
-                  <span>{selectedBriefing.clientPhone}</span>
-                  <span>{selectedBriefing.clientEmail}</span>
+              <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <span className="text-neutral-500 block text-[10px]">CONTATOS DO CLIENTE</span>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-mono text-white">{selectedBriefing.clientPhone}</span>
+                  {selectedBriefing.clientPhone && selectedBriefing.clientPhone !== 'Não informado' && (
+                    <a
+                      href={`https://wa.me/55${selectedBriefing.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Olá ${selectedBriefing.clientName}, tudo bem? Aqui é da equipe NexaWeb referente ao seu briefing para a ${selectedBriefing.businessName}!`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      <span>Chamar no WhatsApp</span>
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-neutral-800/80">
+                  <span className="font-mono text-neutral-300">{selectedBriefing.clientEmail}</span>
+                  {selectedBriefing.clientEmail && selectedBriefing.clientEmail !== 'Não informado' && (
+                    <a
+                      href={`mailto:${selectedBriefing.clientEmail}?subject=${encodeURIComponent(
+                        `NexaWeb - Proposta de Site para ${selectedBriefing.businessName}`
+                      )}`}
+                      className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-500/30 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                    >
+                      <Mail className="w-3 h-3" />
+                      <span>Enviar E-mail</span>
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -817,7 +1022,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
                 <select
                   value={selectedBriefing.status}
                   onChange={(e) => handleUpdateStatus(selectedBriefing.id, e.target.value as BriefingStatus)}
-                  className="px-3 py-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs font-semibold text-white"
+                  className="px-3 py-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs font-semibold text-white outline-none focus:border-amber-400"
                 >
                   <option value="Novo">Novo</option>
                   <option value="Em análise">Em análise</option>
@@ -828,15 +1033,159 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => handleDeleteBriefing(selectedBriefing.id)}
+                className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Excluir</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedBriefing(null)}
-                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-white"
+                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-white transition-colors"
               >
                 Concluir Visualização
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Briefing Creation Modal */}
+      {isNewBriefingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-6 space-y-5 shadow-2xl text-neutral-200">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div>
+                <h3 className="text-lg font-bold font-display text-white">
+                  Cadastrar Novo Briefing / Lead
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Adicione solicitações recebidas por WhatsApp, telefone ou reuniões
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewBriefingModalOpen(false)}
+                className="p-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualBriefing} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">Nome do Cliente *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newForm.clientName}
+                    onChange={(e) => setNewForm({ ...newForm, clientName: e.target.value })}
+                    placeholder="Ex: Carlos Mendes"
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">Nome da Empresa / Projeto *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newForm.businessName}
+                    onChange={(e) => setNewForm({ ...newForm, businessName: e.target.value })}
+                    placeholder="Ex: Mendes Advocacia"
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">Segmento de Atuação</label>
+                  <input
+                    type="text"
+                    value={newForm.businessSegment}
+                    onChange={(e) => setNewForm({ ...newForm, businessSegment: e.target.value })}
+                    placeholder="Ex: Advocacia / Consultoria"
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">Plano</label>
+                  <select
+                    value={newForm.plan}
+                    onChange={(e) => {
+                      const p = e.target.value as any;
+                      const price = p === 'Essencial' ? 'R$ 690' : p === 'Profissional' ? 'R$ 1.700' : p === 'Personalizado' ? 'A partir de R$ 2.500' : 'A partir de R$ 4.500';
+                      setNewForm({ ...newForm, plan: p, estimatedPrice: price });
+                    }}
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white outline-none focus:border-amber-400"
+                  >
+                    <option value="Essencial">Essencial (R$ 690)</option>
+                    <option value="Profissional">Profissional (R$ 1.700)</option>
+                    <option value="Personalizado">Personalizado (Sob Medida)</option>
+                    <option value="Premium">Premium (Projetos de Alto Padrão)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">WhatsApp / Telefone</label>
+                  <input
+                    type="tel"
+                    value={newForm.clientPhone}
+                    onChange={(e) => setNewForm({ ...newForm, clientPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-neutral-400 font-medium">E-mail</label>
+                  <input
+                    type="email"
+                    value={newForm.clientEmail}
+                    onChange={(e) => setNewForm({ ...newForm, clientEmail: e.target.value })}
+                    placeholder="cliente@empresa.com.br"
+                    className="w-full h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-neutral-400 font-medium">Observações / Detalhes do Pedido</label>
+                <textarea
+                  rows={3}
+                  value={newForm.notes}
+                  onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })}
+                  placeholder="Descreva particularidades do site, funcionalidades desejadas, prazos..."
+                  className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-amber-400 resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewBriefingModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-300 hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 text-xs font-bold transition-all shadow-md shadow-amber-400/20"
+                >
+                  Salvar Briefing
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

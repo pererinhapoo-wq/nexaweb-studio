@@ -22,14 +22,27 @@ export const ProjectCarouselSection: React.FC<ProjectCarouselSectionProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeMobileIndex, setActiveMobileIndex] = useState(0);
+  const cardWidthRef = useRef<number>(300);
+
+  // Measure card width once or on window resize, preventing forced reflow during scroll
+  useEffect(() => {
+    const updateCardWidth = () => {
+      const el = scrollContainerRef.current;
+      if (el && el.firstElementChild) {
+        cardWidthRef.current = (el.firstElementChild as HTMLElement).offsetWidth + 14;
+      }
+    };
+
+    updateCardWidth();
+    window.addEventListener('resize', updateCardWidth, { passive: true });
+    return () => window.removeEventListener('resize', updateCardWidth);
+  }, [projects.length]);
 
   // Monitor horizontal scroll position on mobile to update current indicator
   const handleScroll = () => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const cardWidth = el.firstElementChild
-      ? (el.firstElementChild as HTMLElement).offsetWidth + 14 // width + gap
-      : 300;
+    const cardWidth = cardWidthRef.current || 300;
     const newIndex = Math.round(el.scrollLeft / cardWidth);
     if (newIndex !== activeMobileIndex && newIndex >= 0 && newIndex < projects.length) {
       setActiveMobileIndex(newIndex);
@@ -39,9 +52,7 @@ export const ProjectCarouselSection: React.FC<ProjectCarouselSectionProps> = ({
   const scrollToIndex = (index: number) => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const cardWidth = el.firstElementChild
-      ? (el.firstElementChild as HTMLElement).offsetWidth + 14
-      : 300;
+    const cardWidth = cardWidthRef.current || 300;
     el.scrollTo({
       left: index * cardWidth,
       behavior: 'smooth',
@@ -71,8 +82,8 @@ export const ProjectCarouselSection: React.FC<ProjectCarouselSectionProps> = ({
         onScroll={handleScroll}
         className={`${
           isSingle
-            ? 'flex justify-center sm:grid sm:grid-cols-2 lg:grid-cols-3'
-            : 'flex sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 snap-x snap-mandatory scrollbar-none px-4 -mx-4 sm:px-0 sm:mx-0'
+            ? 'flex justify-center items-stretch sm:grid sm:grid-cols-2 lg:grid-cols-3'
+            : 'flex items-stretch sm:grid sm:grid-cols-2 lg:grid-cols-3 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 snap-x snap-mandatory scroll-pl-4 sm:scroll-pl-0 scrollbar-none px-4 -mx-4 sm:px-0 sm:mx-0'
         } gap-3.5 sm:gap-5`}
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
@@ -82,8 +93,8 @@ export const ProjectCarouselSection: React.FC<ProjectCarouselSectionProps> = ({
             className={`${
               isSingle
                 ? 'w-full max-w-[340px] sm:max-w-none'
-                : 'w-[84vw] max-w-[325px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink'
-            } flex flex-col`}
+                : 'w-[84vw] max-w-[325px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:shrink'
+            } flex flex-col items-stretch self-stretch h-full`}
           >
             <ProjectCard
               project={project}
@@ -107,24 +118,28 @@ export const ProjectCarouselSection: React.FC<ProjectCarouselSectionProps> = ({
             <span className="text-[10px] text-neutral-500">· Deslize para o lado</span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 -mr-2">
             <button
               type="button"
               onClick={() => scrollToIndex(Math.max(0, activeMobileIndex - 1))}
               disabled={activeMobileIndex === 0}
-              className="w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-300 disabled:opacity-30 disabled:pointer-events-none active:bg-neutral-800"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-300 disabled:opacity-30 disabled:pointer-events-none"
               aria-label="Projeto anterior"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <span className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center active:bg-neutral-800 transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </span>
             </button>
             <button
               type="button"
               onClick={() => scrollToIndex(Math.min(projects.length - 1, activeMobileIndex + 1))}
               disabled={activeMobileIndex === projects.length - 1}
-              className="w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-300 disabled:opacity-30 disabled:pointer-events-none active:bg-neutral-800"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-300 disabled:opacity-30 disabled:pointer-events-none"
               aria-label="Próximo projeto"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center active:bg-neutral-800 transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </span>
             </button>
           </div>
         </div>

@@ -1,19 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowUpRight, Sparkles, Shield, Award, Sliders, HelpCircle, Layers } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Sparkles, Shield, Award, Sliders, HelpCircle, Layers, Lock } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface NavbarProps {
   onOpenContact: (level?: string | null) => void;
   onOpenAdvisor?: () => void;
   onStartProject?: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenContact,
   onOpenAdvisor,
   onStartProject,
+  onOpenAdmin,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  // Strictly lock background page scroll when mobile drawer is open
+  useScrollLock(mobileMenuOpen);
+
+  // Keyboard Escape and browser/Android back button integration for mobile menu
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    // Push temporary state so Android back button closes menu smoothly
+    window.history.pushState({ nexaDrawer: true }, '');
+    const handlePopState = () => {
+      setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.nexaDrawer) {
+        window.history.back();
+      }
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     let ticking = false;
@@ -39,15 +73,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
+    // Let scroll unlock settle, then smoothly navigate to the target section
     requestAnimationFrame(() => {
-      const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
     });
   };
 
+  const handleAdminClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setMobileMenuOpen(false);
+    if (window.location.pathname !== '/admin') {
+      window.history.pushState(null, '', '/admin');
+    }
+    if (onOpenAdmin) {
+      onOpenAdmin();
+    } else {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  };
+
   const handleStart = () => {
+    setMobileMenuOpen(false);
     if (onStartProject) {
       onStartProject();
     } else {
@@ -167,109 +218,167 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={handleStart}
-              className="sm:hidden px-3 py-1.5 rounded-lg bg-amber-400 text-neutral-950 text-xs font-bold shadow-sm"
+              className="sm:hidden min-h-[38px] px-3.5 py-1.5 rounded-lg bg-amber-400 text-neutral-950 text-xs font-bold shadow-sm"
             >
               Criar site
             </button>
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-colors"
-              aria-label="Abrir menu de navegação"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-colors"
+              aria-label={mobileMenuOpen ? "Fechar menu de navegação" : "Abrir menu de navegação"}
+              aria-expanded={mobileMenuOpen}
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile dropdown drawer */}
+      {/* Mobile Left Drawer & Backdrop (Completely locks background page scroll) */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-neutral-800 bg-neutral-950/98 px-5 py-5 space-y-3.5 animate-fadeIn shadow-2xl">
-          <nav className="flex flex-col gap-2 text-sm font-medium text-neutral-300">
-            <a
-              href="#planos"
-              onClick={(e) => handleNavClick(e, 'planos')}
-              className="text-white flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Ver os 4 Planos</span>
-              </span>
-              <span className="text-[11px] text-amber-400 font-bold">Essencial / Personalizado / Prof / Premium</span>
-            </a>
+        <>
+          {/* Backdrop that prevents touchmove on background */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 lg:hidden animate-fadeIn"
+            onClick={() => setMobileMenuOpen(false)}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            aria-hidden="true"
+          />
 
-            <a
-              href="#showcase"
-              onClick={(e) => handleNavClick(e, 'showcase')}
-              className="p-2 rounded-lg hover:bg-neutral-900 transition-colors text-xs"
-            >
-              Showcase Automático
-            </a>
+          {/* Left Drawer */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu lateral de navegação"
+            className="fixed inset-y-0 left-0 w-[86vw] max-w-[320px] bg-neutral-950 border-r border-neutral-800 z-50 lg:hidden flex flex-col justify-between p-5 overflow-y-auto overscroll-contain shadow-2xl animate-fadeIn"
+            onTouchMove={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            {/* Drawer Header */}
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-neutral-900 p-[1px]">
+                    <div className="w-full h-full bg-neutral-950 rounded-[11px] flex items-center justify-center font-display font-extrabold text-amber-400 text-sm">
+                      N
+                    </div>
+                  </div>
+                  <span className="font-display font-bold text-lg text-white">NexaWeb</span>
+                </div>
 
-            <a
-              href="#segmentos"
-              onClick={(e) => handleNavClick(e, 'segmentos')}
-              className="p-2 rounded-lg hover:bg-neutral-900 transition-colors text-xs"
-            >
-              Tipos de Sites & Segmentos
-            </a>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors"
+                  aria-label="Fechar menu"
+                >
+                  <X className="w-5 h-5 text-amber-400" />
+                </button>
+              </div>
 
-            <a
-              href="#modelos"
-              onClick={(e) => handleNavClick(e, 'modelos')}
-              className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900 text-neutral-200 transition-colors text-xs"
-            >
-              <span>Amostras no Ar</span>
-              <span className="text-xs text-amber-400 font-bold">22 sites</span>
-            </a>
+              {/* Navigation links */}
+              <nav className="flex flex-col gap-2 pt-4 text-sm font-medium text-neutral-300">
+                <a
+                  href="#planos"
+                  onClick={(e) => handleNavClick(e, 'planos')}
+                  className="text-white flex items-center justify-between p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Ver os 4 Planos</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-bold">Oficial</span>
+                </a>
 
-            <a
-              href="#personalizado"
-              onClick={(e) => handleNavClick(e, 'personalizado')}
-              className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900 text-neutral-200 transition-colors text-xs"
-            >
-              <span>Plano Personalizado</span>
-              <span className="text-xs text-purple-400 font-bold">Sob Medida</span>
-            </a>
+                <a
+                  href="#showcase"
+                  onClick={(e) => handleNavClick(e, 'showcase')}
+                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
+                >
+                  Showcase Automático
+                </a>
 
-            <a
-              href="#diferenciais"
-              onClick={(e) => handleNavClick(e, 'diferenciais')}
-              className="p-2 rounded-lg hover:bg-neutral-900 text-neutral-400 transition-colors text-xs"
-            >
-              Diferenciais NexaWeb
-            </a>
-          </nav>
+                <a
+                  href="#segmentos"
+                  onClick={(e) => handleNavClick(e, 'segmentos')}
+                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
+                >
+                  Tipos de Sites & Segmentos
+                </a>
 
-          <div className="pt-2 space-y-2">
-            {onOpenAdvisor && (
+                <a
+                  href="#modelos"
+                  onClick={(e) => handleNavClick(e, 'modelos')}
+                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
+                >
+                  <span>Amostras no Ar</span>
+                  <span className="text-xs text-amber-400 font-bold font-mono">22 sites</span>
+                </a>
+
+                <a
+                  href="#personalizado"
+                  onClick={(e) => handleNavClick(e, 'personalizado')}
+                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
+                >
+                  <span>Plano Personalizado</span>
+                  <span className="text-xs text-purple-400 font-bold">Sob Medida</span>
+                </a>
+
+                <a
+                  href="#diferenciais"
+                  onClick={(e) => handleNavClick(e, 'diferenciais')}
+                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors text-xs"
+                >
+                  Diferenciais NexaWeb
+                </a>
+
+                <a
+                  href="/admin"
+                  onClick={handleAdminClick}
+                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-400 hover:text-amber-400 transition-colors text-xs font-semibold"
+                >
+                  <span className="flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Admin</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-mono">/admin</span>
+                </a>
+              </nav>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-4 space-y-2 border-t border-neutral-800/80">
+              {onOpenAdvisor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenAdvisor();
+                  }}
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-neutral-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <HelpCircle className="w-4 h-4 text-amber-400" />
+                  <span>Me ajude a escolher o plano</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenAdvisor();
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-neutral-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                onClick={handleStart}
+                className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-400/15"
               >
-                <HelpCircle className="w-4 h-4" />
-                <span>Me ajude a escolher o plano</span>
+                <Sparkles className="w-4 h-4" />
+                <span>Criar meu site</span>
+                <ArrowUpRight className="w-4 h-4" />
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleStart();
-              }}
-              className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Criar meu site</span>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </header>
   );

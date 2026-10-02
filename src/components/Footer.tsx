@@ -62,10 +62,10 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
 
           {/* Essencial Projects Links */}
           <div className="space-y-2.5">
-            <h4 className="text-xs uppercase font-bold tracking-wider text-blue-400 flex items-center gap-1.5">
+            <h3 className="text-xs uppercase font-bold tracking-wider text-blue-400 flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
               <span>Essencial</span>
-            </h4>
+            </h3>
             <ul className="space-y-1.5 text-xs">
               {ESSENCIAL_PROJECTS.slice(0, 5).map((p) => (
                 <li key={p.id}>
@@ -89,10 +89,10 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
 
           {/* Profissional & Personalizado */}
           <div className="space-y-2.5">
-            <h4 className="text-xs uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5">
+            <h3 className="text-xs uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5">
               <Award className="w-3.5 h-3.5" />
               <span>Profissional</span>
-            </h4>
+            </h3>
             <ul className="space-y-1.5 text-xs">
               {PROFISSIONAL_PROJECTS.map((p) => (
                 <li key={p.id}>
@@ -126,10 +126,10 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
 
           {/* Premium Projects Links */}
           <div className="space-y-2.5">
-            <h4 className="text-xs uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1.5">
+            <h3 className="text-xs uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Premium</span>
-            </h4>
+            </h3>
             <ul className="space-y-1.5 text-xs">
               {PREMIUM_PROJECTS.slice(0, 5).map((p) => (
                 <li key={p.id}>
@@ -155,24 +155,9 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
         {/* Bottom copyright */}
         <div className="pt-8 mt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
           <p>© {new Date().getFullYear()} NexaWeb. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 text-emerald-400/80">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Plataformas Seguras & Otimizadas
-            </span>
-            <span>·</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenAdmin) onOpenAdmin();
-                else window.location.hash = 'admin';
-              }}
-              className="text-neutral-500 hover:text-neutral-300 inline-flex items-center gap-1 transition-colors"
-              title="Acesso operacional interno"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Painel Interno</span>
-            </button>
+          <div className="flex items-center gap-2 text-emerald-400/80">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Plataformas Seguras & Otimizadas</span>
           </div>
         </div>
       </div>
