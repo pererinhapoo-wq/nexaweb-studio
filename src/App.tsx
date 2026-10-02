@@ -14,7 +14,9 @@ import {
   Layers,
   ArrowRight,
   ArrowLeft,
+  Lock,
 } from 'lucide-react';
+import { checkIsAdminRoute, navigateTo, subscribeToRoute } from './router';
 import {
   ESSENCIAL_PROJECTS,
   PROFISSIONAL_PROJECTS,
@@ -55,8 +57,7 @@ const StartProjectModal = React.lazy(() =>
 
 export default function App() {
   const [isAdminView, setIsAdminView] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.location.pathname === '/admin' || window.location.hash === '#admin';
+    return checkIsAdminRoute();
   });
 
   const [activeCategoryTab, setActiveCategoryTab] = useState<
@@ -65,17 +66,27 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeProject, setActiveProject] = useState<ProjectItem | null>(null);
 
-  // Synchronize admin route changes
+  // Synchronize admin route changes across direct URL, refresh, pushState, popstate & hash
   React.useEffect(() => {
-    const handleRouteCheck = () => {
-      setIsAdminView(window.location.pathname === '/admin' || window.location.hash === '#admin');
+    const unsubscribe = subscribeToRoute((isAdmin) => {
+      setIsAdminView(isAdmin);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Intercept any click to /admin or #admin globally for seamless client-side transition
+  React.useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest('a');
+      if (!target) return;
+      const href = target.getAttribute('href');
+      if (href === '/admin' || href === '/admin/' || href === '#admin') {
+        e.preventDefault();
+        navigateTo('/admin');
+      }
     };
-    window.addEventListener('hashchange', handleRouteCheck);
-    window.addEventListener('popstate', handleRouteCheck);
-    return () => {
-      window.removeEventListener('hashchange', handleRouteCheck);
-      window.removeEventListener('popstate', handleRouteCheck);
-    };
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
   }, []);
 
   // Commercial modal & flow states
@@ -236,12 +247,7 @@ export default function App() {
       >
         <AdminDashboard
           onBackToSite={() => {
-            setIsAdminView(false);
-            if (window.location.hash === '#admin') {
-              window.history.pushState(null, '', window.location.pathname);
-            } else if (window.location.pathname === '/admin') {
-              window.history.pushState(null, '', '/');
-            }
+            navigateTo('/');
           }}
         />
       </React.Suspense>
@@ -256,10 +262,7 @@ export default function App() {
         onOpenAdvisor={() => setAdvisorModalOpen(true)}
         onStartProject={() => setStartModalOpen(true)}
         onOpenAdmin={() => {
-          if (window.location.pathname !== '/admin') {
-            window.history.pushState(null, '', '/admin');
-          }
-          setIsAdminView(true);
+          navigateTo('/admin');
         }}
       />
 
@@ -633,6 +636,20 @@ export default function App() {
                   <span className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.2 rounded-full font-bold">
                     3 Sites no Ar
                   </span>
+
+                  {/* Acesso discreto ao Admin da NexaWeb em Amostras Profissional */}
+                  <a
+                    href="/admin"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigateTo('/admin');
+                    }}
+                    className="p-1 rounded text-neutral-700 hover:text-emerald-400 transition-colors opacity-30 hover:opacity-100 ml-0.5 inline-flex items-center"
+                    title="Acesso Administrativo"
+                    aria-label="Acesso Administrativo"
+                  >
+                    <Lock className="w-3 h-3" />
+                  </a>
                 </div>
 
                 <button
