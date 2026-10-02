@@ -1,17 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { motion, type Variants } from 'framer-motion';
 import {
   Sparkles,
   Shield,
   Award,
   ArrowUpRight,
-  ArrowDown,
   Search,
-  Laptop,
   Zap,
-  TrendingUp,
-  Check,
   Sliders,
+  HelpCircle,
+  TrendingUp,
+  Laptop,
+  CheckCircle2,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import {
   ESSENCIAL_PROJECTS,
@@ -24,23 +25,17 @@ import { ProjectCard } from './components/ProjectCard';
 import { ProjectModal } from './components/ProjectModal';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
-import { ContactModal, type ServiceLevelType } from './components/ContactModal';
-
-// Framer Motion entrance animation variants (fade-in + slide-up)
-const sectionFadeUpVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 45,
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.7,
-      ease: 'easeOut',
-    },
-  },
-};
+import {
+  ContactModal,
+  type ServiceLevelType,
+  type ModelIntentType,
+} from './components/ContactModal';
+import { ShowcaseBanner } from './components/ShowcaseBanner';
+import { PlansSection } from './components/PlansSection';
+import { PlanAdvisorModal } from './components/PlanAdvisorModal';
+import { StartProjectModal } from './components/StartProjectModal';
+import { SegmentsShowcase } from './components/SegmentsShowcase';
+import type { PlanId } from './components/PlanDetailModal';
 
 export default function App() {
   const [activeCategoryTab, setActiveCategoryTab] = useState<
@@ -48,22 +43,87 @@ export default function App() {
   >('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeProject, setActiveProject] = useState<ProjectItem | null>(null);
+
+  // Commercial modal & flow states
   const [contactModalOpen, setContactModalOpen] = useState<boolean>(false);
   const [selectedServiceLevel, setSelectedServiceLevel] = useState<ServiceLevelType | null>(null);
   const [selectedBriefingType, setSelectedBriefingType] = useState<string | null>(null);
+  const [selectedProjectForBriefing, setSelectedProjectForBriefing] = useState<ProjectItem | null>(null);
+  const [selectedInitialIntent, setSelectedInitialIntent] = useState<ModelIntentType>(null);
+  const [selectedInitialDescription, setSelectedInitialDescription] = useState<string>('');
 
+  // Auxiliary modals
+  const [advisorModalOpen, setAdvisorModalOpen] = useState<boolean>(false);
+  const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
+
+  // Opens briefing modal with specified plan or briefing category
   const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
-    const validLevels: ServiceLevelType[] = ['Essencial', 'Profissional', 'Personalizado'];
-    const isServiceLevel = !!level && validLevels.includes(level as ServiceLevelType);
+    const validLevels: ServiceLevelType[] = [
+      'Essencial',
+      'Profissional',
+      'Personalizado',
+      'Premium',
+    ];
 
-    if (isServiceLevel) {
+    setSelectedProjectForBriefing(null);
+    setSelectedInitialIntent('custom_idea');
+    setSelectedInitialDescription('');
+
+    if (level && validLevels.includes(level as ServiceLevelType)) {
       setSelectedServiceLevel(level as ServiceLevelType);
       setSelectedBriefingType(null);
-    } else {
+    } else if (level) {
       setSelectedServiceLevel('Personalizado');
       setSelectedBriefingType(level);
+    } else {
+      setSelectedServiceLevel('Essencial');
+      setSelectedBriefingType(null);
     }
 
+    setContactModalOpen(true);
+  };
+
+  // Called when user selects a plan from PlansSection or PlanDetailModal
+  const handleSelectPlan = (planId: PlanId) => {
+    setSelectedProjectForBriefing(null);
+    setSelectedServiceLevel(planId);
+    setSelectedBriefingType(null);
+    setSelectedInitialIntent(planId === 'Personalizado' ? 'custom_idea' : 'exact');
+    setSelectedInitialDescription('');
+    setContactModalOpen(true);
+  };
+
+  // Called when user clicks "Quero um site deste formato" on any project card or modal
+  const handleSelectFormat = (project: ProjectItem) => {
+    setSelectedProjectForBriefing(project);
+    setSelectedServiceLevel(project.tier as ServiceLevelType);
+    setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
+    setSelectedInitialIntent(null); // will trigger intent choice step ("Quero este formato / Usar como inspiração / Ideia própria")
+    setSelectedInitialDescription('');
+    setContactModalOpen(true);
+  };
+
+  // Called when user starts a custom project from Segments or Hero
+  const handleStartCustomIdea = (segmentName?: string) => {
+    setSelectedProjectForBriefing(null);
+    setSelectedServiceLevel('Personalizado');
+    setSelectedBriefingType(segmentName || null);
+    setSelectedInitialIntent('custom_idea');
+    setSelectedInitialDescription(
+      segmentName ? `Gostaria de um site para o segmento de ${segmentName}. ` : ''
+    );
+    setContactModalOpen(true);
+  };
+
+  // Called when user wants to use a project as inspiration
+  const handleUseAsInspiration = (project: ProjectItem) => {
+    setSelectedProjectForBriefing(project);
+    setSelectedServiceLevel('Personalizado');
+    setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
+    setSelectedInitialIntent('inspiration');
+    setSelectedInitialDescription(
+      `Gostaria de usar o projeto "${project.name}" (${project.category}) como inspiração para o meu site.`
+    );
     setContactModalOpen(true);
   };
 
@@ -109,920 +169,522 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#08090C] text-neutral-100 flex flex-col font-sans selection:bg-amber-400/20 selection:text-amber-200">
       {/* Top Navbar */}
-      <Navbar onOpenContact={() => handleOpenBriefing(null)} />
+      <Navbar
+        onOpenContact={handleOpenBriefing}
+        onOpenAdvisor={() => setAdvisorModalOpen(true)}
+        onStartProject={() => setStartModalOpen(true)}
+      />
 
       {/* Main Content */}
       <main className="flex-1">
-        {/* Subtle Ambient Background Gradients */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-10 left-1/3 -translate-x-1/2 w-[900px] h-[400px] bg-gradient-to-b from-blue-500/10 via-emerald-500/5 to-transparent blur-[140px] rounded-full" />
-          <div className="absolute top-[900px] -left-40 w-[600px] h-[600px] bg-emerald-600/5 blur-[160px] rounded-full" />
-          <div className="absolute top-[1800px] -right-40 w-[600px] h-[600px] bg-amber-500/5 blur-[160px] rounded-full" />
-        </div>
+        {/* Subtle, GPU-friendly background lights (pure CSS gradients, zero layout shift) */}
+        <div
+          className="fixed inset-0 pointer-events-none overflow-hidden z-0"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.07) 0%, transparent 45%),
+              radial-gradient(circle at 10% 35%, rgba(16, 185, 129, 0.04) 0%, transparent 35%),
+              radial-gradient(circle at 90% 65%, rgba(245, 158, 11, 0.04) 0%, transparent 35%)
+            `,
+          }}
+        />
 
-        {/* Hero Section & Main Title Header */}
-        <section className="relative z-10 pt-16 sm:pt-24 pb-12 sm:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="text-center max-w-4xl mx-auto space-y-6">
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1. HERO SECTION & APRESENTAÇÃO
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section className="relative z-10 pt-8 sm:pt-12 pb-8 sm:pb-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto space-y-3.5">
             {/* Tag Kicker */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-900/90 border border-neutral-800 text-xs font-semibold tracking-widest uppercase text-neutral-300 shadow-md">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              <span>Portfólio Oficial NexaWeb</span>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900/90 border border-neutral-800 text-[11px] font-semibold tracking-wider uppercase text-neutral-300 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>Portfólio Oficial NexaWeb · 22 Demonstrações no Ar</span>
             </div>
 
-            {/* Exact Required Title */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white font-display">
-              Projetos{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-blue-400">
+            {/* Main Title */}
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white font-display leading-[1.14]">
+              Sites Profissionais nos Planos{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-sky-300">
                 Essencial
               </span>
               ,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300">
+                Personalizado
+              </span>
+              ,{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">
                 Profissional
               </span>{' '}
               e{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-400">
                 Premium
               </span>
             </h1>
 
-            {/* Exact Required Subtitle */}
-            <p className="text-lg sm:text-xl text-neutral-300 font-normal leading-relaxed max-w-2xl mx-auto">
+            {/* Subtitles */}
+            <p className="text-xs sm:text-sm md:text-base text-neutral-300 font-normal leading-relaxed max-w-2xl mx-auto">
               Conheça alguns dos sites desenvolvidos pela NexaWeb para diferentes tipos de negócios.
             </p>
 
-            <p className="text-sm text-neutral-400 max-w-xl mx-auto">
-              Exemplos reais e publicados de plataformas digitais desenvolvidas com design moderno,
-              alta performance e total adaptação para computadores e celulares.
+            <p className="text-[11px] sm:text-xs text-neutral-400 max-w-xl mx-auto">
+              Exemplos reais e publicados desenvolvidos com design moderno, alta velocidade e total adaptação para computadores e celulares.
             </p>
-          </div>
 
-          {/* Quick Category Jump / Navigation Bar & Search */}
-          <div className="mt-12 max-w-5xl mx-auto">
-            <div className="p-2 sm:p-3 rounded-2xl bg-neutral-900/85 border border-neutral-800/90 backdrop-blur-xl shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              {/* Category Segmented Selector */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none px-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveCategoryTab('todos')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
-                    activeCategoryTab === 'todos'
-                      ? 'bg-neutral-100 text-neutral-950 shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
-                  }`}
-                >
-                  Todos ({ALL_PROJECTS.length})
-                </button>
-
-                <a
-                  href="#projetos-essencial"
-                  onClick={() => setActiveCategoryTab('essencial')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-2 ${
-                    activeCategoryTab === 'essencial'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
-                  }`}
-                >
-                  <Shield className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Essencial (12)</span>
-                </a>
-
-                <a
-                  href="#projetos-profissional"
-                  onClick={() => setActiveCategoryTab('profissional')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-2 ${
-                    activeCategoryTab === 'profissional'
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                      : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
-                  }`}
-                >
-                  <Award className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Profissional (3)</span>
-                </a>
-
-                <a
-                  href="#personalizado"
-                  onClick={() => setActiveCategoryTab('personalizado')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-2 ${
-                    activeCategoryTab === 'personalizado'
-                      ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-                      : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
-                  }`}
-                >
-                  <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Personalizado</span>
-                </a>
-
-                <a
-                  href="#projetos-premium"
-                  onClick={() => setActiveCategoryTab('premium')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-2 ${
-                    activeCategoryTab === 'premium'
-                      ? 'bg-amber-400 text-neutral-950 shadow-md shadow-amber-400/20'
-                      : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Premium (7)</span>
-                </a>
-              </div>
-
-              {/* Live Search Input */}
-              <div className="relative min-w-[220px] sm:min-w-[260px]">
-                <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar por projeto ou segmento..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            💼 APRESENTAÇÃO DOS 3 NÍVEIS DE SERVIÇO DA NEXAWEB
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <section
-          id="niveis-de-servico"
-          className="relative z-10 pt-4 pb-16 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24"
-        >
-          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span>Níveis de Contratação NexaWeb</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
-              Formatos de Serviço
-            </h2>
-            <p className="text-sm sm:text-base text-neutral-300/90 leading-relaxed">
-              Escolha o formato ideal para o momento da sua empresa. Cada nível foi desenvolvido para atender diferentes objetivos de negócio.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 lg:gap-8 items-stretch">
-            {/* 1. ESSENCIAL */}
-            <div className="flex flex-col justify-between rounded-3xl bg-neutral-900/80 border border-neutral-800/90 hover:border-blue-500/50 p-7 sm:p-8 lg:p-9 shadow-xl backdrop-blur-xl transition-all duration-300 group">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-300 border border-blue-500/30">
-                    <Shield className="w-3.5 h-3.5 text-blue-400" />
-                    Essencial
-                  </span>
-                  <span className="text-xs font-mono text-neutral-500">Nível 01</span>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold font-display text-white group-hover:text-blue-200 transition-colors">
-                    Site profissional para começar
-                  </h3>
-                  <p className="text-sm text-neutral-300/90 leading-relaxed">
-                    O essencial para apresentar seu negócio na internet com uma presença profissional, moderna e objetiva.
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <a
-                    href="#projetos-essencial"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"
-                  >
-                    <span>Ver 12 modelos Essencial no portfólio</span>
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-
-              <div className="pt-8 border-t border-neutral-800/80 mt-6">
-                <button
-                  type="button"
-                  onClick={() => handleOpenBriefing('Essencial')}
-                  className="w-full min-h-[48px] py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 hover:from-blue-400 hover:to-blue-300 text-neutral-950 font-bold text-sm tracking-wide shadow-lg shadow-blue-500/15 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Quero meu site Essencial</span>
-                  <ArrowUpRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* 2. PROFISSIONAL */}
-            <div className="flex flex-col justify-between rounded-3xl bg-neutral-900/80 border border-neutral-800/90 hover:border-emerald-500/50 p-7 sm:p-8 lg:p-9 shadow-xl backdrop-blur-xl transition-all duration-300 group">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                    <Award className="w-3.5 h-3.5 text-emerald-400" />
-                    Profissional
-                  </span>
-                  <span className="text-xs font-mono text-neutral-500">Nível 02</span>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold font-display text-white group-hover:text-emerald-200 transition-colors">
-                    Mais recursos para o seu negócio
-                  </h3>
-                  <p className="text-sm text-neutral-300/90 leading-relaxed">
-                    Uma solução mais completa, com maior personalização e recursos para fortalecer a presença digital da sua empresa.
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <a
-                    href="#projetos-profissional"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-                  >
-                    <span>Ver 3 modelos Profissional no portfólio</span>
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-
-              <div className="pt-8 border-t border-neutral-800/80 mt-6">
-                <button
-                  type="button"
-                  onClick={() => handleOpenBriefing('Profissional')}
-                  className="w-full min-h-[48px] py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 hover:from-emerald-300 hover:to-teal-200 text-neutral-950 font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/15 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Quero meu site Profissional</span>
-                  <ArrowUpRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* 3. PERSONALIZADO */}
-            <div className="flex flex-col justify-between rounded-3xl bg-neutral-900/80 border border-neutral-800/90 hover:border-purple-500/50 p-7 sm:p-8 lg:p-9 shadow-xl backdrop-blur-xl transition-all duration-300 group">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                    <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                    Personalizado
-                  </span>
-                  <span className="text-xs font-mono text-neutral-500">Nível 03</span>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold font-display text-white group-hover:text-purple-200 transition-colors">
-                    Um projeto feito para você
-                  </h3>
-                  <p className="text-sm text-neutral-300/90 leading-relaxed">
-                    Um site desenvolvido sob medida para as necessidades, objetivos e identidade do seu negócio.
-                  </p>
-                </div>
-
-                <ul className="space-y-2 pt-1 text-xs text-neutral-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Design exclusivo</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Estrutura personalizada</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Funcionalidades sob medida</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Experiência pensada para o negócio</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Projeto desenvolvido de acordo com as necessidades do cliente</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="pt-8 border-t border-neutral-800/80 mt-6">
-                <button
-                  type="button"
-                  onClick={() => handleOpenBriefing('Personalizado')}
-                  className="w-full min-h-[48px] py-3.5 px-6 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 hover:from-purple-400 hover:to-indigo-300 text-neutral-950 font-bold text-sm tracking-wide shadow-lg shadow-purple-500/15 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Solicitar projeto personalizado</span>
-                  <ArrowUpRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ⚙️ COMO FUNCIONA
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <section
-          id="como-funciona"
-          className="relative z-10 py-20 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60"
-        >
-          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Processo NexaWeb</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
-              Como funciona
-            </h2>
-
-            <p className="text-sm sm:text-base text-neutral-300/90 leading-relaxed max-w-2xl mx-auto">
-              Criar seu site profissional pode ser simples. Escolha o serviço, envie suas informações e acompanhe o desenvolvimento do seu projeto.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-7">
-
-            {/* ETAPA 01 */}
-            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-3xl font-extrabold font-display text-blue-400">
-                  01
-                </span>
-
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center">
-                  <Check className="w-5 h-5 text-blue-400" />
-                </div>
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Escolha seu serviço
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Escolha entre Essencial, Profissional ou Personalizado.
-              </p>
-            </div>
-
-            {/* ETAPA 02 */}
-            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-3xl font-extrabold font-display text-emerald-400">
-                  02
-                </span>
-
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center">
-                  <Check className="w-5 h-5 text-emerald-400" />
-                </div>
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Envie seu briefing
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Conte para a NexaWeb sobre seu negócio, seus objetivos e o que você precisa.
-              </p>
-            </div>
-
-            {/* ETAPA 03 */}
-            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-3xl font-extrabold font-display text-purple-400">
-                  03
-                </span>
-
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-center">
-                  <Check className="w-5 h-5 text-purple-400" />
-                </div>
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Receba o projeto
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                O projeto será desenvolvido de acordo com as informações do briefing.
-              </p>
-            </div>
-
-            {/* ETAPA 04 */}
-            <div className="relative p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-3xl font-extrabold font-display text-amber-400">
-                  04
-                </span>
-
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center">
-                  <Check className="w-5 h-5 text-amber-400" />
-                </div>
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Aprovação e publicação
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Após a aprovação, o site segue para publicação.
-              </p>
-            </div>
-
-          </div>
-        </section>
-                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            🛡️ SEÇÃO DE CONFIANÇA
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <section
-          id="confianca"
-          className="relative z-10 py-20 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60"
-        >
-          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              <span>Confiança NexaWeb</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
-              Um projeto pensado para o seu negócio
-            </h2>
-
-            <p className="text-sm sm:text-base text-neutral-300/90 leading-relaxed max-w-2xl mx-auto">
-              Da primeira informação do briefing à publicação, cada projeto é desenvolvido com atenção à estrutura, ao design e à experiência de navegação.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-7">
-
-            {/* CONFIANÇA 01 */}
-            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-5">
-                <Shield className="w-5 h-5 text-blue-400" />
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Processo claro
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Você escolhe o serviço, envia seu briefing e acompanha o desenvolvimento do projeto até a aprovação.
-              </p>
-            </div>
-
-            {/* CONFIANÇA 02 */}
-            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mb-5">
-                <Laptop className="w-5 h-5 text-emerald-400" />
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Design profissional
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Cada projeto é estruturado para apresentar o negócio de forma moderna, organizada e adaptada para diferentes telas.
-              </p>
-            </div>
-
-            {/* CONFIANÇA 03 */}
-            <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900/70 border border-neutral-800/90 shadow-xl backdrop-blur-xl">
-              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mb-5">
-                <Check className="w-5 h-5 text-amber-400" />
-              </div>
-
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white mb-3">
-                Aprovação antes da publicação
-              </h3>
-
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                O site passa pela etapa de aprovação antes de seguir para publicação, conforme o processo apresentado pela NexaWeb.
-              </p>
-            </div>
-
-          </div>
-        </section>
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            🟦 CATEGORIA 1: PROJETOS ESSENCIAL (12 Cards)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {(activeCategoryTab === 'todos' || activeCategoryTab === 'essencial') && (
-          <motion.section
-            id="projetos-essencial"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.08 }}
-            variants={sectionFadeUpVariants}
-            className="relative z-10 pt-10 pb-20 sm:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24"
-          >
-            {/* Category Header Banner */}
-            <div className="mb-10 sm:mb-14 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-blue-950/40 via-neutral-900/60 to-neutral-900/40 border border-blue-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs font-semibold uppercase tracking-wider text-blue-300">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Categoria Essencial · 12 Projetos</span>
-                </div>
-                <h2 className="text-3xl sm:text-4xl font-bold font-display text-white">
-                  Projetos Essencial
-                </h2>
-                <p className="text-sm sm:text-base text-neutral-300/90 max-w-2xl leading-relaxed">
-                  Sites desenvolvidos para empresas, criadores e prestadores de serviços que buscam
-                  uma presença digital sólida, direta e com excelente custo-benefício.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="px-5 py-3 rounded-2xl bg-neutral-950/80 border border-neutral-800 text-center">
-                  <div className="text-2xl font-extrabold text-blue-400 font-display">12</div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
-                    Sites no Ar
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 12 Essencial Cards Grid */}
-            {filteredEssencial.length === 0 ? (
-              <div className="py-14 text-center space-y-3 bg-neutral-900/30 rounded-3xl border border-neutral-800 p-8">
-                <p className="text-neutral-400 text-sm">
-                  Nenhum projeto Essencial encontrado para "{searchQuery}".
-                </p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-white transition-colors"
-                >
-                  Limpar pesquisa
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 lg:gap-8">
-                {filteredEssencial.map((project, index) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    index={index}
-                    onPreview={(proj) => setActiveProject(proj)}
-                  />
-                ))}
-              </div>
-            )}
-          </motion.section>
-        )}
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            🟩 CATEGORIA 2: PROJETOS PROFISSIONAL (3 Cards)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {(activeCategoryTab === 'todos' || activeCategoryTab === 'profissional') && (
-          <motion.section
-            id="projetos-profissional"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.12 }}
-            variants={sectionFadeUpVariants}
-            className="relative z-10 pt-10 pb-20 sm:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24 border-t border-neutral-800/60"
-          >
-            {/* Category Header Banner */}
-            <div className="mb-10 sm:mb-14 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950/30 via-neutral-900/60 to-neutral-900/40 border border-emerald-500/25 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold uppercase tracking-wider text-emerald-300">
-                  <Award className="w-3.5 h-3.5" />
-                  <span>Categoria Profissional · 3 Projetos</span>
-                </div>
-                {/* Exact Required Title */}
-                <h2 className="text-3xl sm:text-4xl font-bold font-display text-white">
-                  Projetos Profissional
-                </h2>
-                {/* Exact Required Subtitle */}
-                <p className="text-sm sm:text-base text-neutral-300/90 max-w-2xl leading-relaxed">
-                  Sites profissionais desenvolvidos para diferentes tipos de negócios.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="px-5 py-3 rounded-2xl bg-neutral-950/80 border border-neutral-800 text-center">
-                  <div className="text-2xl font-extrabold text-emerald-400 font-display">03</div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
-                    Sites no Ar
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 3 Profissional Cards Grid: 3 cards in one row on desktop, stacked vertically on mobile */}
-            {filteredProfissional.length === 0 ? (
-              <div className="py-14 text-center space-y-3 bg-neutral-900/30 rounded-3xl border border-neutral-800 p-8">
-                <p className="text-neutral-400 text-sm">
-                  Nenhum projeto Profissional encontrado para "{searchQuery}".
-                </p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-white transition-colors"
-                >
-                  Limpar pesquisa
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 lg:gap-8">
-                {filteredProfissional.map((project, index) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    index={index}
-                    onPreview={(proj) => setActiveProject(proj)}
-                  />
-                ))}
-              </div>
-            )}
-          </motion.section>
-        )}
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            🟣 NÍVEL: PERSONALIZADO (Solução Sob Medida)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {(activeCategoryTab === 'todos' || activeCategoryTab === 'personalizado') && (
-          <motion.section
-            id="personalizado"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.12 }}
-            variants={sectionFadeUpVariants}
-            className="relative z-10 pt-10 pb-20 sm:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24 border-t border-neutral-800/60"
-          >
-            {/* Visual presentation showing Personalizado is a bespoke tailor-made solution, distinct from project catalogs */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/75 to-purple-950/20 border border-purple-500/30 p-8 sm:p-10 lg:p-14 shadow-2xl backdrop-blur-xl">
-              {/* Subtle ambient lighting */}
-              <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-                {/* Left column: Header, Description & CTA */}
-                <div className="lg:col-span-7 space-y-6">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs font-semibold uppercase tracking-wider text-purple-300">
-                    <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Solução Sob Medida</span>
-                  </div>
-
-                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
-                    Personalizado
-                  </h2>
-
-                  <p className="text-base sm:text-lg text-neutral-300 leading-relaxed max-w-2xl">
-                    Um site criado sob medida para o seu negócio, com estrutura, design e funcionalidades pensados de acordo com as suas necessidades.
-                  </p>
-
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenBriefing('Personalizado')}
-                      className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 hover:from-purple-400 hover:to-indigo-300 text-neutral-950 font-bold text-sm tracking-wide shadow-lg shadow-purple-500/20 hover:brightness-105 active:scale-[0.98] transition-all"
-                    >
-                      <span>Solicitar projeto personalizado</span>
-                      <ArrowUpRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Right column: The 5 Items list */}
-                <div className="lg:col-span-5 bg-neutral-950/75 border border-neutral-800/90 rounded-2xl p-6 sm:p-7 space-y-4 shadow-xl">
-                  <div className="text-xs uppercase font-bold tracking-wider text-purple-400 flex items-center gap-1.5 pb-2 border-b border-neutral-800/80">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Diferenciais do Serviço Sob Medida</span>
-                  </div>
-
-                  <ul className="space-y-3.5">
-                    <li className="flex items-start gap-3 text-sm text-neutral-200">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5 text-purple-400">
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Design exclusivo</span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm text-neutral-200">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5 text-purple-400">
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Estrutura personalizada</span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm text-neutral-200">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5 text-purple-400">
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Funcionalidades sob medida</span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm text-neutral-200">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5 text-purple-400">
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Experiência pensada para o negócio</span>
-                    </li>
-                    <li className="flex items-start gap-3 text-sm text-neutral-200">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5 text-purple-400">
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Projeto desenvolvido de acordo com as necessidades do cliente</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </motion.section>
-        )}
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            🟨 SEPARAÇÃO VISUAL: PORTFÓLIO / MODELOS PREMIUM (7 Cards)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {(activeCategoryTab === 'todos' || activeCategoryTab === 'premium') && (
-          <motion.section
-            id="projetos-premium"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.12 }}
-            variants={sectionFadeUpVariants}
-            className="relative z-10 pt-16 pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24 border-t-2 border-dashed border-amber-500/25"
-          >
-            {/* Visual Separation Header Banner */}
-            <div className="mb-10 sm:mb-14 p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-amber-950/40 via-neutral-900/80 to-neutral-900/60 border border-amber-500/30 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-xs font-semibold uppercase tracking-wider text-amber-300">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Portfólio / Modelos de Demonstração</span>
-                </div>
-                {/* Exact Required Title */}
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-display text-white">
-                  Conheça nossos projetos Premium
-                </h2>
-                {/* Exact Required Text */}
-                <p className="text-sm sm:text-base text-neutral-300/95 leading-relaxed max-w-2xl">
-                  Veja exemplos de sites desenvolvidos pela NexaWeb para diferentes tipos de negócio.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="px-6 py-4 rounded-2xl bg-neutral-950/90 border border-neutral-800 text-center">
-                  <div className="text-3xl font-extrabold text-amber-400 font-display">07</div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
-                    Modelos de Referência
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 7 Premium Cards Grid */}
-            {filteredPremium.length === 0 ? (
-              <div className="py-14 text-center space-y-3 bg-neutral-900/30 rounded-3xl border border-neutral-800 p-8">
-                <p className="text-neutral-400 text-sm">
-                  Nenhum projeto Premium encontrado para "{searchQuery}".
-                </p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-white transition-colors"
-                >
-                  Limpar pesquisa
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 lg:gap-10">
-                {filteredPremium.map((project, index) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    index={index}
-                    onPreview={(proj) => setActiveProject(proj)}
-                  />
-                ))}
-              </div>
-            )}
-          </motion.section>
-        )}
-
-        {/* NexaWeb Summary Metric Bar */}
-        <section className="relative z-10 border-y border-neutral-800/80 bg-neutral-950/70 backdrop-blur-md py-14">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 text-center">
-              <div className="space-y-2">
-                <div className="text-3xl sm:text-4xl font-extrabold text-white font-display">22</div>
-                <div className="text-xs uppercase tracking-wider font-semibold text-neutral-300">
-                  Total de Projetos
-                </div>
-                <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                  12 Essencial, 3 Profissional e 7 Premium em produção.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-3xl sm:text-4xl font-extrabold text-blue-400 font-display">
-                  12
-                </div>
-                <div className="text-xs uppercase tracking-wider font-semibold text-blue-300">
-                  Essencial
-                </div>
-                <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                  Soluções ágeis com foco em conversão e presença digital.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-3xl sm:text-4xl font-extrabold text-emerald-400 font-display">
-                  03
-                </div>
-                <div className="text-xs uppercase tracking-wider font-semibold text-emerald-300">
-                  Profissional
-                </div>
-                <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                  Apresentação refinada para arquitetura, estética e tech.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-3xl sm:text-4xl font-extrabold text-amber-400 font-display">
-                  07
-                </div>
-                <div className="text-xs uppercase tracking-wider font-semibold text-amber-300">
-                  Premium
-                </div>
-                <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                  Experiências imersivas de alto padrão para marcas de luxo.
-                </p>
-              </div>
-
-              <div className="space-y-2 col-span-2 lg:col-span-1">
-                <div className="text-3xl sm:text-4xl font-extrabold text-white font-display">
-                  100%
-                </div>
-                <div className="text-xs uppercase tracking-wider font-semibold text-neutral-300">
-                  Responsivo
-                </div>
-                <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                  Navegação perfeita e botões otimizados para toque no celular.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Diferenciais NexaWeb */}
-        <section
-          id="diferenciais"
-          className="relative z-10 py-24 sm:py-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
-        >
-          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
-            <span className="text-xs uppercase font-bold tracking-widest text-amber-400">
-              Excelência Técnica
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold font-display text-white">
-              Por que a NexaWeb é a escolha certa?
-            </h2>
-            <p className="text-sm sm:text-base text-neutral-400">
-              Combinamos conhecimento técnico de ponta, estética apurada e estratégias reais de
-              conversão para cada tipo de cliente.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-3xl bg-neutral-900/60 border border-neutral-800 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                <Laptop className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-white font-display">Design Sob Medida</h3>
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Cada site é construído respeitando as características do segmento, sem layouts
-                genéricos.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-3xl bg-neutral-900/60 border border-neutral-800 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <Zap className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-white font-display">Velocidade e Estabilidade</h3>
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Carregamento ultra-rápido garantido por arquiteturas em nuvem modernas e imagens
-                otimizadas.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-3xl bg-neutral-900/60 border border-neutral-800 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-white font-display">Conversão e Resultados</h3>
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                Hierarquia clara, chamadas para ação estratégicas e canais de contato diretos no
-                WhatsApp.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Final CTA Banner */}
-        <section className="relative z-10 py-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-neutral-800 p-8 sm:p-12 lg:p-16 text-center space-y-6 shadow-2xl">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white">
-              Pronto para ter um site como esses?
-            </h2>
-            <p className="text-neutral-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-              Descubra qual categoria — Essencial, Profissional ou Premium — melhor atende aos objetivos e ao
-              momento do seu negócio.
-            </p>
-            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* Hero Main Action Buttons */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
+              {/* Primary "Criar meu site" button */}
               <button
                 type="button"
-                onClick={() => handleOpenBriefing(null)}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-sm tracking-wide shadow-xl shadow-amber-400/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                onClick={() => setStartModalOpen(true)}
+                className="min-h-[44px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-400/20 active:scale-[0.98] transition-all inline-flex items-center gap-2"
               >
-                <span>Falar com a NexaWeb</span>
-                <ArrowUpRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
+                <span>Criar meu site</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
 
               <a
-                href="#projetos-essencial"
-                className="w-full sm:w-auto px-6 py-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white text-sm font-semibold border border-neutral-700 transition-colors"
+                href="#planos"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-700/80 text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5"
               >
-                Explorar Todos os 22 Projetos
+                <span>Conhecer os 4 Planos</span>
               </a>
+
+              <button
+                type="button"
+                onClick={() => setAdvisorModalOpen(true)}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl text-neutral-400 hover:text-amber-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span>Me ajude a escolher</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              2. BANNER / SHOWCASE AUTOMÁTICO
+             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          <div id="showcase" className="mt-7 sm:mt-10 scroll-mt-20">
+            <ShowcaseBanner
+              onSelectProject={(proj) => handleSelectFormat(proj)}
+              onExplorePlans={() => {
+                const element = document.getElementById('planos');
+                element?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+          </div>
+        </section>
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            3. FLUXO CENTRAL: ESCOLHA DE PLANOS
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <PlansSection onSelectPlan={handleSelectPlan} />
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            4. APRESENTAÇÃO DE SEGMENTOS & POSSIBILIDADES (Visualização Própria por Categoria)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <SegmentsShowcase
+          onSelectFormat={handleSelectFormat}
+          onPreviewProject={(proj) => setActiveProject(proj)}
+          onUseAsInspiration={handleUseAsInspiration}
+          onStartCustomProject={(segmentName) => {
+            handleStartCustomIdea(segmentName);
+          }}
+        />
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            5. CATÁLOGO / SHOWCASE DE DEMONSTRAÇÕES (22 PROJETOS REAIS)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section
+          id="modelos"
+          className="relative z-10 pt-6 pb-10 sm:pb-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60 scroll-mt-18"
+        >
+          {/* Header & Filter / Search Bar */}
+          <div className="mb-6 space-y-3.5">
+            <div className="text-center sm:text-left flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                  Vitrine Oficial de Amostras
+                </span>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
+                  Demonstrações Reais no Ar
+                </h2>
+                <p className="text-xs text-neutral-400 mt-0.5 max-w-xl">
+                  Cada amostra funciona como referência visual do que entregamos. Você pode escolher exatamente o mesmo formato ou utilizá-lo como inspiração.
+                </p>
+              </div>
+
+              {/* Live Search Input */}
+              <div className="relative min-w-[220px] sm:w-72">
+                <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar por segmento ou nome..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-amber-400/50 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Category Segmented Selector */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('todos')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+                  activeCategoryTab === 'todos'
+                    ? 'bg-neutral-100 text-neutral-950 shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                }`}
+              >
+                Todas as Amostras ({ALL_PROJECTS.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('essencial')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeCategoryTab === 'essencial'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                }`}
+              >
+                <Shield className="w-3 h-3 text-blue-300" />
+                <span>Essencial ({ESSENCIAL_PROJECTS.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('personalizado')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeCategoryTab === 'personalizado'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                }`}
+              >
+                <Sliders className="w-3 h-3 text-purple-300" />
+                <span>Personalizado (Sob Medida)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('profissional')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeCategoryTab === 'profissional'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                }`}
+              >
+                <Award className="w-3 h-3 text-emerald-300" />
+                <span>Profissional ({PROFISSIONAL_PROJECTS.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('premium')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeCategoryTab === 'premium'
+                    ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>Premium ({PREMIUM_PROJECTS.length})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              PROJETOS ESSENCIAL (12 CARDS)
+             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {(activeCategoryTab === 'todos' || activeCategoryTab === 'essencial') && (
+            <div id="projetos-essencial" className="mb-10 sm:mb-12 scroll-mt-20">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-400" />
+                  <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+                    Amostras Essencial
+                  </h3>
+                  <span className="text-[11px] text-blue-300 bg-blue-500/10 border border-blue-500/30 px-2 py-0.2 rounded-full font-bold">
+                    12 Sites no Ar
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPlan('Essencial')}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-1"
+                >
+                  <span>Ver plano Essencial</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {filteredEssencial.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
+                  Nenhum projeto encontrado para "{searchQuery}".
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredEssencial.map((project, index) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      index={index}
+                      onPreview={(proj) => setActiveProject(proj)}
+                      onSelectFormat={handleSelectFormat}
+                      onSelectPlan={handleSelectPlan}
+                      onUseAsInspiration={handleUseAsInspiration}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              SOLUÇÃO PERSONALIZADA (SOB MEDIDA)
+             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {(activeCategoryTab === 'todos' || activeCategoryTab === 'personalizado') && (
+            <div id="personalizado" className="mb-10 sm:mb-12 scroll-mt-20">
+              <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-neutral-900 via-neutral-900 to-purple-950/25 border border-purple-500/30 p-5 sm:p-7 lg:p-8 shadow-xl">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-7 items-center">
+                  <div className="lg:col-span-7 space-y-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider text-purple-300">
+                      <Sliders className="w-3 h-3" />
+                      <span>Solução Sob Medida</span>
+                    </span>
+
+                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold font-display text-white">
+                      Projeto Personalizado
+                    </h3>
+
+                    <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-xl">
+                      Um site criado sob medida para o seu negócio, com estilo visual configurável (Moderno, Minimalista, Elegante, Luxuoso ou Criativo), seções sob medida e recursos pensados especificamente para suas metas.
+                    </p>
+
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleStartCustomIdea()}
+                        className="min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 hover:brightness-105 text-neutral-950 font-bold text-xs sm:text-sm shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-all"
+                      >
+                        <span>Abrir configurador sob medida</span>
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-5 bg-neutral-950/80 border border-neutral-800 rounded-2xl p-4 space-y-2">
+                    <div className="text-[11px] uppercase font-bold tracking-wider text-purple-400">
+                      O que você escolhe no briefing:
+                    </div>
+                    <ul className="space-y-1.5 text-xs text-neutral-300">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>Estilo: Moderno, Minimalista, Elegante, Luxuoso ou Criativo</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>Seções: Início, Sobre, Serviços, Portfólio, Depoimentos, FAQ</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>Funcionalidades: WhatsApp, Formulário, Galeria, Efeitos</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>Cores sugeridas ou paleta própria</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>Referência de sites e descrição livre</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              PROJETOS PROFISSIONAL (3 CARDS)
+             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {(activeCategoryTab === 'todos' || activeCategoryTab === 'profissional') && (
+            <div id="projetos-profissional" className="mb-10 sm:mb-12 scroll-mt-20">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+                    Amostras Profissional
+                  </h3>
+                  <span className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.2 rounded-full font-bold">
+                    3 Sites no Ar
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPlan('Profissional')}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1"
+                >
+                  <span>Ver plano Profissional</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {filteredProfissional.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
+                  Nenhum projeto encontrado para "{searchQuery}".
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredProfissional.map((project, index) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      index={index}
+                      onPreview={(proj) => setActiveProject(proj)}
+                      onSelectFormat={handleSelectFormat}
+                      onSelectPlan={handleSelectPlan}
+                      onUseAsInspiration={handleUseAsInspiration}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              PROJETOS PREMIUM (7 CARDS)
+             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {(activeCategoryTab === 'todos' || activeCategoryTab === 'premium') && (
+            <div id="projetos-premium" className="mb-6 scroll-mt-20">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+                    Amostras Premium
+                  </h3>
+                  <span className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.2 rounded-full font-bold">
+                    7 Sites Alto Padrão
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPlan('Premium')}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-semibold inline-flex items-center gap-1"
+                >
+                  <span>Ver plano Premium</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {filteredPremium.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
+                  Nenhum projeto encontrado para "{searchQuery}".
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredPremium.map((project, index) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      index={index}
+                      onPreview={(proj) => setActiveProject(proj)}
+                      onSelectFormat={handleSelectFormat}
+                      onSelectPlan={handleSelectPlan}
+                      onUseAsInspiration={handleUseAsInspiration}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            6. DIFERENCIAIS TÉCNICOS & CONFIABILIDADE
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section
+          id="diferenciais"
+          className="relative z-10 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-neutral-800/60"
+        >
+          <div className="max-w-2xl mx-auto text-center space-y-2 mb-7">
+            <span className="text-xs uppercase font-bold tracking-wider text-amber-400">
+              Excelência Técnica
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold font-display text-white">
+              Por que a NexaWeb é a escolha certa?
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-400">
+              Qualidade estética, design responsivo de alto nível e velocidade de carregamento para o seu negócio.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+            <div className="p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                <Laptop className="w-4 h-4" />
+              </div>
+              <h3 className="text-base font-bold text-white font-display">Design Sob Medida</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Cada site respeita as características do segmento, com identidade marcante e foco em autoridade.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Zap className="w-4 h-4" />
+              </div>
+              <h3 className="text-base font-bold text-white font-display">Velocidade e Estabilidade</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Carregamento ultra-rápido garantido por infraestrutura moderna em nuvem e imagens otimizadas.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <h3 className="text-base font-bold text-white font-display">Conversão e Resultados</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Hierarquia clara, chamadas estratégicas e canais diretos no WhatsApp para converter visitantes em clientes.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            7. FINAL ACTION CALLOUT
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <section className="relative z-10 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-neutral-800 p-6 sm:p-9 text-center space-y-3.5 shadow-xl">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
+              Pronto para ter um site como esses?
+            </h2>
+            <p className="text-neutral-300 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+              Descubra qual plano — Essencial, Personalizado, Profissional ou Premium — melhor atende ao seu momento e comece hoje mesmo.
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStartModalOpen(true)}
+                className="w-full sm:w-auto min-h-[44px] px-7 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-amber-400/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Criar meu site</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdvisorModalOpen(true)}
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white text-xs sm:text-sm font-semibold border border-neutral-700 transition-colors"
+              >
+                Me ajude a escolher o plano
+              </button>
             </div>
           </div>
         </section>
@@ -1031,29 +693,69 @@ export default function App() {
       {/* Footer */}
       <Footer />
 
-      {/* Project Quick Inspector Modal */}
+      {/* Project Inspector Modal */}
       <ProjectModal
         project={activeProject}
         onClose={() => setActiveProject(null)}
         onOpenBriefing={handleOpenBriefing}
+        onSelectPlan={handleSelectPlan}
+        onSelectFormat={(proj) => {
+          setActiveProject(null);
+          handleSelectFormat(proj);
+        }}
+        onUseAsInspiration={(proj) => {
+          setActiveProject(null);
+          handleUseAsInspiration(proj);
+        }}
       />
 
-      {/* Contact / Proposal Modal */}
+      {/* Centralized Briefing & Commercial Flow Modal */}
       <ContactModal
         isOpen={contactModalOpen}
         onClose={() => {
           setContactModalOpen(false);
           setSelectedServiceLevel(null);
           setSelectedBriefingType(null);
+          setSelectedProjectForBriefing(null);
+          setSelectedInitialIntent(null);
+          setSelectedInitialDescription('');
           setActiveProject(null);
         }}
         onBack={() => {
           setContactModalOpen(false);
-          setSelectedServiceLevel(null);
-          setSelectedBriefingType(null);
+          setSelectedProjectForBriefing(null);
+          setSelectedInitialIntent(null);
+          setSelectedInitialDescription('');
         }}
         serviceLevel={selectedServiceLevel}
         briefingType={selectedBriefingType}
+        selectedProject={selectedProjectForBriefing}
+        initialIntent={selectedInitialIntent}
+        initialDescription={selectedInitialDescription}
+      />
+
+      {/* Plan Advisor Wizard Modal */}
+      <PlanAdvisorModal
+        isOpen={advisorModalOpen}
+        onClose={() => setAdvisorModalOpen(false)}
+        onSelectPlan={handleSelectPlan}
+      />
+
+      {/* Start Project ("Criar meu site") Modal */}
+      <StartProjectModal
+        isOpen={startModalOpen}
+        onClose={() => setStartModalOpen(false)}
+        onChooseSample={() => {
+          const element = document.getElementById('modelos');
+          element?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onChooseCustomIdea={() => {
+          handleStartCustomIdea();
+        }}
+        onChoosePlanDirectly={() => {
+          const element = document.getElementById('planos');
+          element?.scrollIntoView({ behavior: 'smooth' });
+        }}
       />
     </div>
   );

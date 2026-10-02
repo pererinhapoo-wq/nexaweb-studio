@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, Sparkles, Shield, Award, ExternalLink, Eye } from 'lucide-react';
+import { ArrowUpRight, Sparkles, Shield, Award, ExternalLink, Eye, ArrowRight } from 'lucide-react';
 import type { ProjectItem } from '../data/projects';
 import { ProjectCardImage } from './ProjectCardImage';
 
@@ -7,148 +7,181 @@ interface ProjectCardProps {
   project: ProjectItem;
   index: number;
   onPreview: (project: ProjectItem) => void;
+  onSelectFormat?: (project: ProjectItem) => void;
+  onSelectPlan?: (tier: ProjectItem['tier']) => void;
+  onUseAsInspiration?: (project: ProjectItem) => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, index, onPreview }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  index,
+  onPreview,
+  onSelectFormat,
+  onUseAsInspiration,
+}) => {
   const isPremium = project.tier === 'Premium';
   const isProfissional = project.tier === 'Profissional';
 
-  // Determine border & glow styling
+  // Card theme styling
   const cardBorderClass = isPremium
-    ? 'border-neutral-800/90 hover:border-amber-500/50 hover:shadow-amber-500/10'
+    ? 'border-neutral-800/80 hover:border-amber-500/40 hover:shadow-amber-500/10'
     : isProfissional
-    ? 'border-neutral-800/90 hover:border-emerald-500/50 hover:shadow-emerald-500/10'
-    : 'border-neutral-800/90 hover:border-blue-500/50 hover:shadow-blue-500/10';
+    ? 'border-neutral-800/80 hover:border-emerald-500/40 hover:shadow-emerald-500/10'
+    : 'border-neutral-800/80 hover:border-blue-500/40 hover:shadow-blue-500/10';
 
   const categoryColorClass = isPremium
-    ? 'text-amber-400/80'
+    ? 'text-amber-400'
     : isProfissional
-    ? 'text-emerald-400/80'
-    : 'text-blue-400/80';
-
-  const titleHoverClass = isPremium
-    ? 'group-hover:text-amber-200'
-    : isProfissional
-    ? 'group-hover:text-emerald-200'
-    : 'group-hover:text-blue-200';
+    ? 'text-emerald-400'
+    : 'text-blue-400';
 
   const buttonGradientClass = isPremium
-    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-neutral-950 shadow-amber-400/10 hover:shadow-amber-400/25 hover:brightness-105'
+    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-neutral-950 shadow-md shadow-amber-400/15 hover:brightness-105'
     : isProfissional
-    ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-neutral-950 shadow-emerald-500/10 hover:shadow-emerald-500/25 hover:brightness-105'
-    : 'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 text-neutral-950 shadow-blue-500/10 hover:shadow-blue-500/25 hover:brightness-105';
+    ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-neutral-950 shadow-md shadow-emerald-500/15 hover:brightness-105'
+    : 'bg-gradient-to-r from-blue-500 via-sky-400 to-blue-500 text-neutral-950 shadow-md shadow-blue-500/15 hover:brightness-105';
+
+  const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
 
   return (
     <article
-      className={`group relative flex flex-col justify-between rounded-3xl bg-neutral-900/85 backdrop-blur-xl border transition-all duration-500 overflow-hidden shadow-xl hover:shadow-2xl ${cardBorderClass}`}
+      className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl bg-neutral-900/90 border transition-all duration-300 overflow-hidden shadow-lg hover:shadow-xl hover:-translate-y-1 ${cardBorderClass}`}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '360px' }}
       aria-label={`Projeto ${project.name} - ${project.tier} NexaWeb`}
     >
-      {/* Background ambient lighting on hover */}
-      <div
-        className={`absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-br ${project.accentColor} blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none`}
-      />
-
       <div>
-        {/* Visual Cover / Image Showcase */}
-        <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full">
-          <ProjectCardImage project={project} className="w-full h-full" />
+        {/* Cover / Image Showcase */}
+        <div className="relative aspect-[16/10] w-full">
+          <ProjectCardImage project={project} className="w-full h-full" priority={index < 3} />
 
-          {/* Tier Identification Tag (Essencial, Profissional or Premium) */}
-          <div className="absolute bottom-4 left-4 z-10">
+          {/* Tier badge indicator */}
+          <div className="absolute bottom-2.5 left-2.5 z-10">
             {isPremium && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-neutral-950/90 text-amber-300 border border-amber-500/40 backdrop-blur-md shadow-lg shadow-black/60">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-amber-300 border border-amber-500/40 shadow-md">
+                <Sparkles className="w-3 h-3 text-amber-400" />
                 <span>Premium</span>
-              </div>
+              </span>
             )}
             {isProfissional && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-neutral-950/90 text-emerald-300 border border-emerald-500/40 backdrop-blur-md shadow-lg shadow-black/60">
-                <Award className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-emerald-300 border border-emerald-500/40 shadow-md">
+                <Award className="w-3 h-3 text-emerald-400" />
                 <span>Profissional</span>
-              </div>
+              </span>
             )}
             {!isPremium && !isProfissional && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-neutral-950/90 text-blue-300 border border-blue-500/40 backdrop-blur-md shadow-lg shadow-black/60">
-                <Shield className="w-3.5 h-3.5 text-blue-400 fill-blue-400/20" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-950/90 text-blue-300 border border-blue-500/40 shadow-md">
+                <Shield className="w-3 h-3 text-blue-400" />
                 <span>Essencial</span>
-              </div>
+              </span>
             )}
           </div>
 
-          {/* Quick detail preview button on top corner */}
-          <div className="absolute bottom-4 right-4 z-10">
+          {/* Quick detail preview button */}
+          <div className="absolute bottom-2.5 right-2.5 z-10">
             <button
               type="button"
               onClick={() => onPreview(project)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-neutral-950/80 hover:bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-700/60 backdrop-blur-md transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-neutral-950/85 hover:bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-700/60 shadow-sm transition-colors"
               title="Ver detalhes do projeto"
             >
-              <Eye className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Detalhes</span>
+              <Eye className="w-3 h-3" />
+              <span>Visão Geral</span>
             </button>
           </div>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 sm:p-7 lg:p-8 flex flex-col gap-3.5">
-          {/* Category & Counter */}
-          <div className="flex items-center justify-between text-xs tracking-wider uppercase font-semibold text-neutral-400">
-            <span className={categoryColorClass}>
-              {project.category}
-            </span>
-            <span className="text-neutral-500 font-mono text-[11px]">
-              {String(index + 1).padStart(2, '0')}
+        <div className="p-4 sm:p-5 flex flex-col gap-2">
+          {/* Category & Index */}
+          <div className="flex items-center justify-between text-[11px] tracking-wider uppercase font-semibold">
+            <span className={categoryColorClass}>{project.category}</span>
+            <span className="text-neutral-500 font-mono text-[10px]">
+              #{String(index + 1).padStart(2, '0')}
             </span>
           </div>
 
           {/* Project Name */}
-          <h3
-            className={`text-xl sm:text-2xl font-bold tracking-tight text-white font-display transition-colors ${titleHoverClass}`}
-          >
+          <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-display transition-colors group-hover:text-amber-200">
             {project.name}
           </h3>
 
-          {/* Brief Description */}
-          <p className="text-neutral-300/90 text-sm leading-relaxed line-clamp-3">
+          {/* Description */}
+          <p className="text-neutral-300/85 text-xs sm:text-sm leading-relaxed line-clamp-2">
             {project.description}
           </p>
 
           {/* Feature Highlights */}
-          <div className="pt-2 flex flex-wrap gap-2">
-            {project.highlights.map((feat) => (
+          <div className="pt-1 flex flex-wrap gap-1.5">
+            {project.highlights.slice(0, 4).map((feat) => (
               <span
                 key={feat}
-                className="text-xs text-neutral-300 bg-neutral-950/60 border border-neutral-800 rounded-lg px-2.5 py-1"
+                className="text-[11px] text-neutral-300 bg-neutral-950/70 border border-neutral-800/80 rounded-md px-2 py-0.5"
               >
                 {feat}
               </span>
             ))}
+            {project.highlights.length > 4 && (
+              <span className="text-[10px] text-neutral-400 self-center">
+                +{project.highlights.length - 4}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Card Actions Footer with prominent "Ver projeto" button */}
-      <div className="p-6 sm:p-7 lg:p-8 pt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 border-t border-neutral-800/60 mt-4">
-        {/* Exact "Ver projeto" Button requested by user */}
-        <a
-          href={project.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] ${buttonGradientClass}`}
-        >
-          <span>Ver projeto</span>
-          <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        </a>
+      {/* Card Actions Footer with "Quero um site deste formato", "Ver site no ar" and "Usar como inspiração" */}
+      <div className="p-4 sm:p-5 pt-0 flex flex-col gap-2 border-t border-neutral-800/60 mt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Main Commercial Action: Quero um site deste formato */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onSelectFormat) {
+                onSelectFormat(project);
+              } else {
+                onPreview(project);
+              }
+            }}
+            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-[0.98] ${buttonGradientClass}`}
+          >
+            <span>Quero um site deste formato</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
 
-        {/* Secondary Detail Inspector Button */}
-        <button
-          type="button"
-          onClick={() => onPreview(project)}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/60 text-xs font-semibold transition-colors"
-        >
-          <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-          <span>Visão Geral</span>
-        </button>
+          {/* Secondary: Ver site no ar */}
+          {isRealUrl ? (
+            <a
+              href={project.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+              title="Abrir demonstração no ar"
+            >
+              <span>Ver site no ar</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-neutral-400" />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onPreview(project)}
+              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+            >
+              <span>Detalhes</span>
+              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+            </button>
+          )}
+        </div>
+
+        {onUseAsInspiration && (
+          <button
+            type="button"
+            onClick={() => onUseAsInspiration(project)}
+            className="w-full min-h-[36px] py-1.5 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 text-[11px] font-semibold text-purple-300 hover:text-purple-200 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
+          >
+            <Sparkles className="w-3 h-3 text-purple-400" />
+            <span>Usar este projeto como inspiração</span>
+          </button>
+        )}
       </div>
     </article>
   );

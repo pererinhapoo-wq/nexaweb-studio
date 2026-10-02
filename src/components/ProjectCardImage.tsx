@@ -1,82 +1,169 @@
-import React, { useState } from 'react';
-import { Globe, ImageOff } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Globe, Sparkles } from 'lucide-react';
 import type { ProjectItem } from '../data/projects';
 
 interface ProjectCardImageProps {
   project: ProjectItem;
   className?: string;
+  priority?: boolean;
 }
 
-export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({ project, className = '' }) => {
-  // Primary: Live homepage capture from mshots
-  // Secondary fallback: Curated high-res domain photography
-  const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(project.url)}?w=1200&h=750`;
-  
-  const [currentSrc, setCurrentSrc] = useState<string>(screenshotUrl);
-  const [usingFallback, setUsingFallback] = useState<boolean>(false);
+export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
+  project,
+  className = '',
+  priority = false,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState<boolean>(priority);
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
+  const [hasError, setHasError] = useState<boolean>(false);
 
-  const handleError = () => {
-    if (!usingFallback) {
-      setUsingFallback(true);
-      setCurrentSrc(project.fallbackImage);
+  const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
+
+  // Optimized screenshot thumbnail endpoint (640x400 for speed, retina sharpness, small payload)
+  const screenshotUrl = useMemo(() => {
+    if (!isRealUrl) return '';
+    return `https://s0.wp.com/mshots/v1/${encodeURIComponent(project.url)}?w=640&h=400`;
+  }, [project.url, isRealUrl]);
+
+  // Clean domain display safely
+  const displayHostname = useMemo(() => {
+    if (!isRealUrl) return 'nexaweb.com.br';
+    try {
+      return new URL(project.url).hostname.replace(/^www\./, '');
+    } catch {
+      return 'nexaweb.com.br';
     }
-  };
+  }, [project.url, isRealUrl]);
+
+  // IntersectionObserver for lazy loading images only when near viewport (250px margin)
+  useEffect(() => {
+    if (priority || isInView) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        rootMargin: '250px 0px',
+        threshold: 0.01,
+      }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [priority, isInView]);
+
+  const tierAccent =
+    project.tier === 'Premium'
+      ? {
+          text: 'text-amber-400',
+          bg: 'from-amber-500/20 via-neutral-900 to-neutral-950',
+          badge: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+        }
+      : project.tier === 'Profissional'
+      ? {
+          text: 'text-emerald-400',
+          bg: 'from-emerald-500/20 via-neutral-900 to-neutral-950',
+          badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+        }
+      : {
+          text: 'text-blue-400',
+          bg: 'from-blue-500/20 via-neutral-900 to-neutral-950',
+          badge: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+        };
 
   return (
-    <div className={`relative overflow-hidden bg-neutral-950 ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative overflow-hidden bg-[#0d0f14] ${className}`}
+    >
       {/* Subtle simulated browser chrome */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3.5 py-2 bg-neutral-950/85 backdrop-blur-md border-b border-neutral-800/80">
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 py-1.5 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-neutral-700/80 group-hover:bg-red-500/80 transition-colors" />
           <span className="w-2 h-2 rounded-full bg-neutral-700/80 group-hover:bg-amber-500/80 transition-colors" />
           <span className="w-2 h-2 rounded-full bg-neutral-700/80 group-hover:bg-emerald-500/80 transition-colors" />
         </div>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-neutral-900/90 border border-neutral-800/70 text-[10px] font-mono text-neutral-400 max-w-[190px] sm:max-w-[240px] truncate">
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-900/90 border border-neutral-800/80 text-[10px] font-mono text-neutral-400 max-w-[180px] sm:max-w-[220px] truncate">
           <Globe className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
-          <span className="truncate">
-  {project.url === '#' ? 'NexaWeb' : new URL(project.url).hostname}
-</span>
+          <span className="truncate">{displayHostname}</span>
         </div>
 
-        <span className="text-[10px] font-semibold tracking-wider text-neutral-400">
-          {project.tier === 'Premium' && (
-            <span className="text-amber-400/90 font-medium">PREMIUM</span>
-          )}
-          {project.tier === 'Profissional' && (
-            <span className="text-emerald-400/90 font-medium">PROFISSIONAL</span>
-          )}
-          {project.tier === 'Essencial' && (
-            <span className="text-blue-400/90 font-medium">ESSENCIAL</span>
-          )}
+        <span className={`text-[9px] font-bold tracking-wider uppercase ${tierAccent.text}`}>
+          {project.tier}
         </span>
       </div>
 
-      {/* Image with seamless fallback */}
-      <img
-        src={currentSrc}
-        alt={`Visual do site ${project.name} - NexaWeb`}
-        loading="lazy"
-        onLoad={() => setImageLoaded(true)}
-        onError={handleError}
-        className={`w-full h-full object-cover object-top transition-all duration-700 ease-out group-hover:scale-105 ${
-          imageLoaded ? 'opacity-100 brightness-[0.92] group-hover:brightness-100' : 'opacity-0'
-        }`}
-      />
+      {/* Main image presentation */}
+      {isRealUrl && !hasError && isInView ? (
+        <>
+          <img
+            src={screenshotUrl}
+            alt={`Captura do site ${project.name} - NexaWeb`}
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setHasError(true)}
+            className={`w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03] ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
 
-      {/* Loading placeholder skeleton */}
-      {!imageLoaded && (
-        <div className="absolute inset-0 bg-neutral-900 animate-pulse flex items-center justify-center">
-          <div className="text-center p-4 space-y-2">
-            <div className="w-8 h-8 rounded-full bg-neutral-800 mx-auto animate-spin border-2 border-neutral-600 border-t-amber-400" />
-            <p className="text-xs text-neutral-500 font-mono">Carregando visual...</p>
+          {/* Skeleton while image is loading */}
+          {!imageLoaded && (
+            <div className="absolute inset-0 pt-7 flex flex-col items-center justify-center bg-neutral-900/90">
+              <div className="w-6 h-6 rounded-full border-2 border-neutral-700 border-t-amber-400 animate-spin mb-2" />
+              <span className="text-[11px] font-mono text-neutral-500">
+                Captura ao vivo...
+              </span>
+            </div>
+          )}
+        </>
+      ) : (
+        /* Fallback presentation: clean aesthetic preview with title, category, and mock structure */
+        <div
+          className={`w-full h-full pt-8 p-4 flex flex-col justify-between bg-gradient-to-br ${tierAccent.bg}`}
+        >
+          <div className="space-y-1.5">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-400">
+              {project.category}
+            </span>
+            <h4 className="text-base sm:text-lg font-bold font-display text-white">
+              {project.name}
+            </h4>
+            <p className="text-xs text-neutral-400 line-clamp-2">
+              {project.tagline || project.description}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className={`w-3.5 h-3.5 ${tierAccent.text}`} />
+              <span className="text-[11px] font-medium text-neutral-300">
+                Demonstração NexaWeb
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-neutral-500">
+              100% Responsivo
+            </span>
           </div>
         </div>
       )}
 
-      {/* Gradient vignette for contrast */}
-      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent pointer-events-none" />
+      {/* Subtle bottom gradient shadow for contrast */}
+      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-neutral-950/80 to-transparent pointer-events-none" />
     </div>
   );
 };
