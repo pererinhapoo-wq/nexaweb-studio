@@ -267,7 +267,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
               <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
                 Investimento
               </span>
-              <div className="text-2xl font-extrabold font-display text-white">
+              <div className="text-2xl font-bold font-display text-white">
                 {plan.price}
               </div>
             </div>

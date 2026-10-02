@@ -1,4 +1,5 @@
-import { put } from '@vercel/blob';
+// MOCKED — in-memory Map stub for AI Studio environment (Phase 2.3 of migration guidelines)
+const inMemoryBlobs = new Map<string, { buffer: ArrayBuffer; contentType: string }>();
 
 export async function POST(request: Request) {
   try {
@@ -19,18 +20,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const blob = await put(
-      `briefings/${Date.now()}-${file.name}`,
-      file,
-      {
-        access: 'public',
-        addRandomSuffix: true,
-      }
-    );
+    const pathname = `briefings/${Date.now()}-${file.name}`;
+    const buffer = await file.arrayBuffer();
+    inMemoryBlobs.set(pathname, { buffer, contentType: file.type });
+
+    // Generate responsive safe data URL for client preview
+    const base64 = Buffer.from(buffer).toString('base64');
+    const url = `data:${file.type};base64,${base64}`;
 
     return Response.json({
-      url: blob.url,
-      pathname: blob.pathname,
+      url,
+      pathname,
     });
   } catch (error) {
     console.error('Erro ao fazer upload:', error);
@@ -40,4 +40,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-        }
+}

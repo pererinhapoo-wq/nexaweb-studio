@@ -27,16 +27,16 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
   return (
     <section
       id="planos"
-      className="relative z-10 py-12 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20"
+      className="relative z-10 py-8 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20"
     >
       {/* Header */}
-      <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 space-y-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
+      <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12 space-y-2.5 sm:space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full bg-neutral-900 border border-neutral-800 text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-300 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
           <span>Planos Oficiais NexaWeb</span>
         </div>
 
-        <h2 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-display text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold font-display text-white tracking-tight">
           Escolha o Plano Ideal
         </h2>
 
@@ -120,7 +120,7 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
                 {/* Plan Name & Tagline */}
                 <div>
                   <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                    <h3 className="text-lg sm:text-xl font-bold font-display text-white tracking-tight">
                       {plan.name}
                     </h3>
                     <span className="text-xs sm:text-sm font-extrabold text-neutral-200">
@@ -160,13 +160,13 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
                   <span>Ver o que está incluído</span>
                 </button>
 
-                {/* Choose Plan Button - Opens presentation first as required */}
+                {/* Choose Plan Button - Direct action to choose plan */}
                 <button
                   type="button"
-                  onClick={() => setDetailModalPlan(planId)}
+                  onClick={() => onSelectPlan(planId)}
                   className={`w-full min-h-[44px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${cardTheme.btn}`}
                 >
-                  <span>Conhecer {plan.name}</span>
+                  <span>Escolher Plano {plan.name}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

@@ -17,10 +17,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   useEffect(() => {
     let ticking = false;
+    let lastScrolled = false;
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          setScrolled(window.scrollY > 24);
+          const isScrolled = window.scrollY > 24;
+          if (isScrolled !== lastScrolled) {
+            lastScrolled = isScrolled;
+            setScrolled(isScrolled);
+          }
           ticking = false;
         });
         ticking = true;
@@ -30,6 +35,17 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    setMobileMenuOpen(false);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  };
 
   const handleStart = () => {
     if (onStartProject) {
@@ -172,7 +188,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="flex flex-col gap-2 text-sm font-medium text-neutral-300">
             <a
               href="#planos"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'planos')}
               className="text-white flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
             >
               <span className="flex items-center gap-2">
@@ -184,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#showcase"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'showcase')}
               className="p-2 rounded-lg hover:bg-neutral-900 transition-colors text-xs"
             >
               Showcase Automático
@@ -192,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#segmentos"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'segmentos')}
               className="p-2 rounded-lg hover:bg-neutral-900 transition-colors text-xs"
             >
               Tipos de Sites & Segmentos
@@ -200,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#modelos"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'modelos')}
               className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900 text-neutral-200 transition-colors text-xs"
             >
               <span>Amostras no Ar</span>
@@ -209,7 +225,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#personalizado"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'personalizado')}
               className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900 text-neutral-200 transition-colors text-xs"
             >
               <span>Plano Personalizado</span>
@@ -218,7 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#diferenciais"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleNavClick(e, 'diferenciais')}
               className="p-2 rounded-lg hover:bg-neutral-900 text-neutral-400 transition-colors text-xs"
             >
               Diferenciais NexaWeb

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { ALL_PROJECTS, type ProjectItem } from '../data/projects';
 import { ProjectCard } from './ProjectCard';
+import { ProjectCarouselSection } from './ProjectCarouselSection';
 import {
   FEATURE_CATALOG,
   findSegmentPreset,
@@ -665,7 +666,7 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
     <section
       ref={sectionRef}
       id="segmentos"
-      className="relative z-10 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20 border-t border-neutral-800/60"
+      className="relative z-10 py-8 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20 border-t border-neutral-800/60"
     >
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           CASO 1: VISUALIZAÇÃO DEDICADA DA CATEGORIA ESCOLHIDA
@@ -694,7 +695,7 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
                   <span>Segmento Oficial</span>
                 </div>
 
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white tracking-tight uppercase">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold font-display text-white tracking-tight">
                   {currentSegment.name}
                 </h2>
 
@@ -728,31 +729,25 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
           {/* Projetos Existentes ou Estado Vazio */}
           {segmentProjects.length > 0 ? (
             <div className="space-y-6">
-              {/* Grid: 2 or 3 columns on desktop, 1 column on mobile */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {segmentProjects.map((project, index) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    index={index}
-                    onPreview={(proj) => {
-                      if (onPreviewProject) {
-                        onPreviewProject(proj);
-                      }
-                    }}
-                    onSelectFormat={(proj) => {
-                      if (onSelectFormat) {
-                        onSelectFormat(proj);
-                      }
-                    }}
-                    onUseAsInspiration={(proj) => {
-                      if (onUseAsInspiration) {
-                        onUseAsInspiration(proj);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
+              {/* Carousel on mobile, multi-column grid on desktop */}
+              <ProjectCarouselSection
+                projects={segmentProjects}
+                onPreview={(proj) => {
+                  if (onPreviewProject) {
+                    onPreviewProject(proj);
+                  }
+                }}
+                onSelectFormat={(proj) => {
+                  if (onSelectFormat) {
+                    onSelectFormat(proj);
+                  }
+                }}
+                onUseAsInspiration={(proj) => {
+                  if (onUseAsInspiration) {
+                    onUseAsInspiration(proj);
+                  }
+                }}
+              />
 
               {/* Technical Catalog & Features Explorer for this Segment */}
               {currentPreset && (
@@ -888,7 +883,7 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
               Possibilidades de Criação
             </span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white tracking-tight">
+            <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold font-display text-white tracking-tight">
               Tipos de Sites que a NexaWeb Desenvolve
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">

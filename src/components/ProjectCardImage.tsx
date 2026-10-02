@@ -75,7 +75,7 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
         });
       },
       {
-        rootMargin: '200px 0px',
+        rootMargin: '120px 0px',
         threshold: 0.01,
       }
     );
@@ -166,16 +166,16 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
 
       {/* Main image presentation or elegant placeholder */}
       {attemptSource !== 'placeholder' && activeImageSrc && isInView ? (
-        <>
+        <div className="w-full h-full pt-7 pb-0.5 relative flex items-center justify-center">
           <img
             key={activeImageSrc}
             src={activeImageSrc}
-            alt={`Captura automática do site ${project.name} - NexaWeb`}
+            alt={`Captura da demonstração ${project.name} - NexaWeb`}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             onLoad={handleImageLoad}
             onError={handleImageError}
-            className={`w-full h-full object-cover object-top transition-all duration-500 ease-out group-hover:scale-[1.03] ${
+            className={`w-full h-full object-contain object-top bg-[#08090C] transition-opacity duration-300 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
@@ -189,7 +189,7 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
               </span>
             </div>
           )}
-        </>
+        </div>
       ) : (
         /* Fallback placeholder: Domain-tailored clean layout, never shows broken image */
         <div

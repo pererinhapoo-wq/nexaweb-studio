@@ -39,6 +39,18 @@ body {
 
 .font-display {
   font-family: var(--font-display);
+  font-stretch: normal;
+  letter-spacing: -0.03em;
+  font-feature-settings: "kern" 1, "liga" 1;
+  word-spacing: -0.015em;
+}
+
+@media (max-width: 640px) {
+  .font-display {
+    font-stretch: normal;
+    letter-spacing: -0.025em;
+    word-spacing: -0.02em;
+  }
 }
 
 /* Hardware accelerated transform utility */

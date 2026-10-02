@@ -46,7 +46,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   return (
     <article
       className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl bg-neutral-900/90 border transition-all duration-300 overflow-hidden shadow-lg hover:shadow-xl hover:-translate-y-1 ${cardBorderClass}`}
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '360px' }}
       aria-label={`Projeto ${project.name} - ${project.tier} NexaWeb`}
     >
       <div>
@@ -91,38 +90,38 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-4 sm:p-5 flex flex-col gap-2">
+        <div className="p-3.5 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
           {/* Category & Index */}
-          <div className="flex items-center justify-between text-[11px] tracking-wider uppercase font-semibold">
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] tracking-wider uppercase font-semibold">
             <span className={categoryColorClass}>{project.category}</span>
-            <span className="text-neutral-500 font-mono text-[10px]">
+            <span className="text-neutral-500 font-mono text-[9px] sm:text-[10px]">
               #{String(index + 1).padStart(2, '0')}
             </span>
           </div>
 
           {/* Project Name */}
-          <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-display transition-colors group-hover:text-amber-200">
+          <h3 className="text-sm sm:text-base font-bold tracking-tight text-white font-display line-clamp-1 transition-colors group-hover:text-amber-200">
             {project.name}
           </h3>
 
           {/* Description */}
-          <p className="text-neutral-300/85 text-xs sm:text-sm leading-relaxed line-clamp-2">
+          <p className="text-neutral-300/85 text-[11px] sm:text-xs leading-relaxed line-clamp-2">
             {project.description}
           </p>
 
           {/* Feature Highlights */}
-          <div className="pt-1 flex flex-wrap gap-1.5">
-            {project.highlights.slice(0, 4).map((feat) => (
+          <div className="pt-0.5 flex flex-wrap gap-1 sm:gap-1.5">
+            {project.highlights.slice(0, 3).map((feat) => (
               <span
                 key={feat}
-                className="text-[11px] text-neutral-300 bg-neutral-950/70 border border-neutral-800/80 rounded-md px-2 py-0.5"
+                className="text-[10px] sm:text-[11px] text-neutral-300 bg-neutral-950/70 border border-neutral-800/80 rounded-md px-1.5 sm:px-2 py-0.5"
               >
                 {feat}
               </span>
             ))}
-            {project.highlights.length > 4 && (
-              <span className="text-[10px] text-neutral-400 self-center">
-                +{project.highlights.length - 4}
+            {project.highlights.length > 3 && (
+              <span className="text-[9px] sm:text-[10px] text-neutral-400 self-center">
+                +{project.highlights.length - 3}
               </span>
             )}
           </div>
@@ -130,8 +129,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       </div>
 
       {/* Card Actions Footer with "Quero um site deste formato", "Ver site no ar" and "Usar como inspiração" */}
-      <div className="p-4 sm:p-5 pt-0 flex flex-col gap-2 border-t border-neutral-800/60 mt-2">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div className="p-3.5 sm:p-5 pt-0 flex flex-col gap-1.5 sm:gap-2 border-t border-neutral-800/60 mt-1 sm:mt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
           {/* Main Commercial Action: Quero um site deste formato */}
           <button
             type="button"
@@ -142,7 +141,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 onPreview(project);
               }
             }}
-            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-[0.98] ${buttonGradientClass}`}
+            className={`flex-1 min-h-[42px] sm:min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-[0.98] ${buttonGradientClass}`}
           >
             <span>Quero um site deste formato</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -154,7 +153,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               href={project.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+              className="min-h-[38px] sm:min-h-[44px] px-3 sm:px-3.5 py-1.5 sm:py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
               title="Abrir demonstração no ar"
             >
               <span>Ver site no ar</span>
@@ -164,7 +163,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             <button
               type="button"
               onClick={() => onPreview(project)}
-              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+              className="min-h-[38px] sm:min-h-[44px] px-3 sm:px-3.5 py-1.5 sm:py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
             >
               <span>Detalhes</span>
               <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
@@ -176,7 +175,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <button
             type="button"
             onClick={() => onUseAsInspiration(project)}
-            className="w-full min-h-[36px] py-1.5 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 text-[11px] font-semibold text-purple-300 hover:text-purple-200 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
+            className="w-full min-h-[34px] sm:min-h-[36px] py-1 sm:py-1.5 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 text-[10px] sm:text-[11px] font-semibold text-purple-300 hover:text-purple-200 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
           >
             <Sparkles className="w-3 h-3 text-purple-400" />
             <span>Usar este projeto como inspiração</span>

@@ -100,7 +100,7 @@ const ESTILOS_VISUAIS = [
   },
 ];
 
-const SECOES_PERSONALIZADO = [
+const SECOES_PERSONALIZADO_DEFAULT = [
   'Início / Destaque',
   'Sobre Nós / História',
   'Serviços / Especialidades',
@@ -110,7 +110,7 @@ const SECOES_PERSONALIZADO = [
   'Contato / Localização',
 ];
 
-const FUNCIONALIDADES_PERSONALIZADO = [
+const FUNCIONALIDADES_PERSONALIZADO_DEFAULT = [
   'Botão fixo de WhatsApp',
   'Formulário comercial direto',
   'Galeria de fotos / Trabalhos',
@@ -119,6 +119,106 @@ const FUNCIONALIDADES_PERSONALIZADO = [
   'Catálogo interativo de itens',
   'Integração com redes sociais',
 ];
+
+export const SEGMENT_TAILORED_PRESETS: Record<
+  string,
+  {
+    name: string;
+    secoes: string[];
+    recursos: string[];
+  }
+> = {
+  academia: {
+    name: 'Academia / Fitness',
+    secoes: [
+      'Modalidades & Aulas',
+      'Grade de Horários',
+      'Professores & Instrutores',
+      'Planos & Mensalidades',
+      'Área do Aluno (Login & Perfil)',
+      'Agendamento de Treinos',
+      'Presença & Frequência',
+      'Resultados & Metas',
+      'Próximos Treinos',
+      'Localização & Contato',
+    ],
+    recursos: [
+      'Área do aluno com login',
+      'Agendamento de aulas',
+      'Registro de presença',
+      'Resultados e histórico de treinos',
+      'Próximos treinos e notificações',
+      '⚡ Ocupação e fluxo da academia em tempo real',
+      '⚡ Disponibilidade de equipamentos em uso',
+      'Botão fixo de WhatsApp',
+      'Tabela de planos e mensalidades',
+    ],
+  },
+  restaurante: {
+    name: 'Restaurante / Gastronomia',
+    secoes: [
+      'Cardápio Digital Completo',
+      'Categorias de Pratos e Bebidas',
+      'Reserva de Mesas Online',
+      'Pedidos Online & Delivery',
+      'Status do Pedido ao Vivo',
+      'Horários de Funcionamento',
+      'Localização & Estacionamento',
+      'Contato',
+    ],
+    recursos: [
+      'Cardápio digital por categorias',
+      'Sistema de reserva de mesas',
+      'Pedidos online com carrinho',
+      'Status do pedido ao vivo',
+      '⚡ Ocupação de mesas e status em tempo real',
+      'Botão fixo de WhatsApp',
+      'Localização com rota no Google Maps',
+    ],
+  },
+  imobiliaria: {
+    name: 'Imobiliária / Corretores',
+    secoes: [
+      'Catálogo de Imóveis (Venda & Locação)',
+      'Busca & Filtros Avançados',
+      'Perfil de Corretores & Especialistas',
+      'Agendamento de Visitas Presenciais',
+      'Lista de Favoritos & Histórico',
+      'Disponibilidade dos Imóveis',
+      'Guia de Bairros & Localização',
+      'Contato',
+    ],
+    recursos: [
+      'Busca e filtros avançados de imóveis',
+      'Lista de favoritos e imóveis salvos',
+      'Agendamento de visitas com corretores',
+      '⚡ Status ao vivo do imóvel (Disponível/Reservado/Vendido)',
+      'Botão fixo de WhatsApp',
+      'Localização Google Maps integrado',
+    ],
+  },
+  engenharia: {
+    name: 'Engenharia / Construção',
+    secoes: [
+      'Serviços & Especialidades de Engenharia',
+      'Projetos Concluídos & Em Andamento',
+      'Diário de Obras & Cronograma',
+      'Portfólio Técnico de Engenharia',
+      'Equipe de Engenheiros & Técnicos',
+      'Solicitação de Orçamento / Estudo Técnico',
+      'Certificações de Qualidade & Normas Técnicas',
+      'Contato & Endereço',
+    ],
+    recursos: [
+      'Galeria técnica de projetos executados',
+      'Diário de obras e relatórios técnicos',
+      'Formulário para solicitação de orçamento',
+      'Apresentação de certificações e equipe',
+      '⚡ Atualizações e status da obra em tempo real',
+      'Botão fixo de WhatsApp',
+    ],
+  },
+};
 
 export const ContactModal: React.FC<ContactModalProps> = ({
   isOpen,
@@ -246,6 +346,39 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   // Hook 28: currentPreset
   const currentPreset = useMemo(() => {
     return findSegmentPreset(businessSegment || selectedPresetId);
+  }, [businessSegment, selectedPresetId]);
+
+  // Hook 28b: customSegmentOptions tailored for Personalizado plan (Academia, Restaurante, Imobiliaria, Engenharia, etc.)
+  const customSegmentOptions = useMemo(() => {
+    const key = (businessSegment || selectedPresetId || '').toLowerCase().trim();
+    if (key.includes('fit') || key.includes('acad') || key.includes('cross')) {
+      return SEGMENT_TAILORED_PRESETS['academia'];
+    }
+    if (
+      key.includes('rest') ||
+      key.includes('gastro') ||
+      key.includes('comid') ||
+      key.includes('pizz') ||
+      key.includes('hamb')
+    ) {
+      return SEGMENT_TAILORED_PRESETS['restaurante'];
+    }
+    if (key.includes('imob') || key.includes('corret') || key.includes('imove')) {
+      return SEGMENT_TAILORED_PRESETS['imobiliaria'];
+    }
+    if (key.includes('eng') || key.includes('obra') || key.includes('constr')) {
+      return SEGMENT_TAILORED_PRESETS['engenharia'];
+    }
+
+    const preset = findSegmentPreset(key);
+    return {
+      name: preset.name,
+      secoes: preset.defaultStructure.length > 0 ? preset.defaultStructure : SECOES_PERSONALIZADO_DEFAULT,
+      recursos: [
+        ...preset.standardFeatures.map((f) => FEATURE_CATALOG[f]?.name || f),
+        ...preset.realtimeFeatures.map((f) => FEATURE_CATALOG[f]?.name || f),
+      ],
+    };
   }, [businessSegment, selectedPresetId]);
 
   // Hook 29: planData
@@ -518,6 +651,24 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       setSelectedFuncionalidades(preset.standardFeatures.slice(0, 5));
       setSelectedAdvancedFeatures(preset.advancedFeatures.slice(0, 2));
       setSelectedRealtimeFeatures([]);
+    }
+  };
+
+  const handleSelectPersonalizadoSegment = (segmentKey: string) => {
+    setSelectedPresetId(segmentKey);
+    const tailored = SEGMENT_TAILORED_PRESETS[segmentKey];
+    if (tailored) {
+      setBusinessSegment(tailored.name.split('/')[0].trim());
+      setSelectedSecoes(tailored.secoes.slice(0, 5));
+      setSelectedFuncionalidades(tailored.recursos.slice(0, 4));
+    } else {
+      const preset = findSegmentPreset(segmentKey);
+      setBusinessSegment(preset.name.split('/')[0].trim());
+      setSelectedSecoes(preset.defaultStructure.slice(0, 5));
+      setSelectedFuncionalidades([
+        ...preset.standardFeatures.slice(0, 3).map((f) => FEATURE_CATALOG[f]?.name || f),
+        ...preset.realtimeFeatures.slice(0, 1).map((f) => FEATURE_CATALOG[f]?.name || f),
+      ]);
     }
   };
 
@@ -1036,12 +1187,59 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
               {/* SPECIFIC PLAN CUSTOMIZATION */}
               {activePlan === 'Personalizado' ? (
-                /* PERSONALIZADO RICH CONFIGURATOR (Preserved 100%) */
+                /* PERSONALIZADO RICH CONFIGURATOR (Preserved 100% & Enhanced with Segment Presets) */
                 <div className="space-y-5">
+                  {/* Seletor de Segmento de Atuação */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
+                        1. Segmento de Atuação do Projeto:
+                      </label>
+                      <span className="text-[11px] font-mono text-purple-300 font-semibold">
+                        {customSegmentOptions.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {[
+                        { key: 'academia', label: 'Academia' },
+                        { key: 'restaurante', label: 'Restaurante' },
+                        { key: 'imobiliaria', label: 'Imobiliária' },
+                        { key: 'engenharia', label: 'Engenharia' },
+                        { key: 'barbearia', label: 'Barbearia' },
+                        { key: 'ecommerce', label: 'Loja' },
+                        { key: 'clinica', label: 'Clínica' },
+                        { key: 'criador', label: 'Criador' },
+                        { key: 'hotel', label: 'Hotel/Pousada' },
+                        { key: 'empresa', label: 'Empresa B2B' },
+                      ].map((item) => {
+                        const isSelected =
+                          selectedPresetId === item.key ||
+                          (businessSegment &&
+                            businessSegment.toLowerCase().includes(item.label.toLowerCase()));
+
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => handleSelectPersonalizadoSegment(item.key)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                              isSelected
+                                ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20'
+                                : 'bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Estilo Visual */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
-                      1. Escolha o Estilo Visual do Site:
+                      2. Escolha o Estilo Visual do Site:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {ESTILOS_VISUAIS.map((estilo) => {
@@ -1074,13 +1272,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Seções */}
+                  {/* Seções Específicas do Segmento */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
-                      2. Seções Desejadas no Site:
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
+                        3. Seções Desejadas no Site:
+                      </label>
+                      <span className="text-[10px] text-neutral-400">
+                        Opções para {customSegmentOptions.name}
+                      </span>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {SECOES_PERSONALIZADO.map((sec) => {
+                      {customSegmentOptions.secoes.map((sec) => {
                         const isSelected = selectedSecoes.includes(sec);
                         return (
                           <button
@@ -1095,7 +1299,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                 : 'border-neutral-800 bg-neutral-950/80 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <span>{sec}</span>
+                            <span className="truncate pr-1">{sec}</span>
                             {isSelected ? (
                               <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                             ) : (
@@ -1107,14 +1311,22 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Funcionalidades */}
+                  {/* Funcionalidades e Recursos Específicos do Segmento */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
-                      3. Funcionalidades e Recursos Especiais:
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
+                        4. Recursos & Funcionalidades Especiais:
+                      </label>
+                      <span className="text-[10px] text-neutral-400">
+                        Para {customSegmentOptions.name}
+                      </span>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {FUNCIONALIDADES_PERSONALIZADO.map((func) => {
+                      {customSegmentOptions.recursos.map((func) => {
                         const isSelected = selectedFuncionalidades.includes(func);
+                        const isRealtime = func.includes('⚡') || func.includes('tempo real');
+
                         return (
                           <button
                             key={func}
@@ -1129,10 +1341,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                             className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between ${
                               isSelected
                                 ? 'border-purple-500 bg-purple-500/10 text-purple-200'
+                                : isRealtime
+                                ? 'border-amber-500/30 bg-amber-500/5 text-neutral-300 hover:border-amber-500/50'
                                 : 'border-neutral-800 bg-neutral-950/80 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <span>{func}</span>
+                            <span className="truncate pr-1">{func}</span>
                             {isSelected ? (
                               <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                             ) : (
@@ -1147,7 +1361,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   {/* Cores */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
-                      4. Paleta de Cores:
+                      5. Paleta de Cores:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button

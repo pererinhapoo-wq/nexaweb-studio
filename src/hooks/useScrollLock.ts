@@ -117,22 +117,33 @@ export function unlockScroll() {
         document.body.style.paddingRight = originalBodyStyles.paddingRight || '';
         originalBodyStyles = null;
 
+        // Force layout reflow before scrolling so document height is acknowledged after position:fixed removal
+        void document.documentElement.offsetHeight;
+
         // Restore scroll position instantly without jumping to top
         const targetScrollY = savedScrollY;
 
         // Explicitly reset savedScrollY so future modal openings never inherit stale values
         savedScrollY = 0;
 
-        window.scrollTo({
-          top: targetScrollY,
-          left: 0,
-          behavior: 'instant' as ScrollBehavior,
-        });
+        window.scrollTo(0, targetScrollY);
         document.documentElement.scrollTop = targetScrollY;
         document.body.scrollTop = targetScrollY;
 
-        // Re-enable original scroll behavior after DOM layout has settled
+        // Re-enable original scroll behavior after DOM layout has settled and verify scroll
         requestAnimationFrame(() => {
+          if (targetScrollY > 0) {
+            const currentActualY =
+              window.pageYOffset ||
+              document.documentElement.scrollTop ||
+              document.body.scrollTop ||
+              0;
+            if (Math.abs(currentActualY - targetScrollY) > 5) {
+              window.scrollTo(0, targetScrollY);
+              document.documentElement.scrollTop = targetScrollY;
+              document.body.scrollTop = targetScrollY;
+            }
+          }
           document.documentElement.style.scrollBehavior = prevHtmlScrollBehavior;
           document.body.style.scrollBehavior = prevBodyScrollBehavior;
         });

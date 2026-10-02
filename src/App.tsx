@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Layers,
   ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   ESSENCIAL_PROJECTS,
@@ -22,6 +23,7 @@ import {
   type ProjectItem,
 } from './data/projects';
 import { ProjectCard } from './components/ProjectCard';
+import { ProjectCarouselSection } from './components/ProjectCarouselSection';
 import { ProjectModal } from './components/ProjectModal';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -36,14 +38,33 @@ import { PlansSection } from './components/PlansSection';
 import { PlanAdvisorModal } from './components/PlanAdvisorModal';
 import { StartProjectModal } from './components/StartProjectModal';
 import { SegmentsShowcase } from './components/SegmentsShowcase';
+import { AdminDashboard } from './components/AdminDashboard';
 import type { PlanId } from './components/PlanDetailModal';
 
 export default function App() {
+  const [isAdminView, setIsAdminView] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.pathname === '/admin' || window.location.hash === '#admin';
+  });
+
   const [activeCategoryTab, setActiveCategoryTab] = useState<
     'todos' | 'essencial' | 'profissional' | 'personalizado' | 'premium'
   >('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeProject, setActiveProject] = useState<ProjectItem | null>(null);
+
+  // Synchronize admin route changes
+  React.useEffect(() => {
+    const handleRouteCheck = () => {
+      setIsAdminView(window.location.pathname === '/admin' || window.location.hash === '#admin');
+    };
+    window.addEventListener('hashchange', handleRouteCheck);
+    window.addEventListener('popstate', handleRouteCheck);
+    return () => {
+      window.removeEventListener('hashchange', handleRouteCheck);
+      window.removeEventListener('popstate', handleRouteCheck);
+    };
+  }, []);
 
   // Commercial modal & flow states
   const [contactModalOpen, setContactModalOpen] = useState<boolean>(false);
@@ -57,6 +78,25 @@ export default function App() {
   const [advisorModalOpen, setAdvisorModalOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
   const [modalInitialStage, setModalInitialStage] = useState<BriefingStage>('presentation');
+
+  // Handle mobile and browser back navigation seamlessly
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (activeProject) {
+        setActiveProject(null);
+      } else if (contactModalOpen) {
+        setContactModalOpen(false);
+      } else if (advisorModalOpen) {
+        setAdvisorModalOpen(false);
+      } else if (startModalOpen) {
+        setStartModalOpen(false);
+      } else if (activeCategoryTab !== 'todos') {
+        setActiveCategoryTab('todos');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeProject, contactModalOpen, advisorModalOpen, startModalOpen, activeCategoryTab]);
 
   // Opens briefing modal with specified plan or briefing category
   const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
@@ -173,6 +213,21 @@ export default function App() {
     });
   }, [searchQuery]);
 
+  if (isAdminView) {
+    return (
+      <AdminDashboard
+        onBackToSite={() => {
+          setIsAdminView(false);
+          if (window.location.hash === '#admin') {
+            window.history.pushState(null, '', window.location.pathname);
+          } else if (window.location.pathname === '/admin') {
+            window.history.pushState(null, '', '/');
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#08090C] text-neutral-100 flex flex-col font-sans selection:bg-amber-400/20 selection:text-amber-200">
       {/* Top Navbar */}
@@ -208,21 +263,21 @@ export default function App() {
             </div>
 
             {/* Main Title */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white font-display leading-[1.14]">
+            <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold tracking-tight text-white font-display leading-[1.25] sm:leading-[1.18] max-w-3xl mx-auto">
               Sites Profissionais nos Planos{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-sky-300">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-sky-300 font-bold">
                 Essencial
               </span>
               ,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300 font-bold">
                 Personalizado
               </span>
               ,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 font-bold">
                 Profissional
               </span>{' '}
               e{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-400 font-bold">
                 Premium
               </span>
             </h1>
@@ -312,7 +367,7 @@ export default function App() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
                   Vitrine Oficial de Amostras
                 </span>
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-display text-white">
                   Demonstrações Reais no Ar
                 </h2>
                 <p className="text-xs text-neutral-400 mt-0.5 max-w-xl">
@@ -408,6 +463,17 @@ export default function App() {
             <div id="projetos-essencial" className="mb-10 sm:mb-12 scroll-mt-20">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
                 <div className="flex items-center gap-2">
+                  {activeCategoryTab !== 'todos' && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCategoryTab('todos')}
+                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                      title="Voltar para todas as amostras"
+                      aria-label="Voltar para todas as amostras"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-amber-400" />
+                    </button>
+                  )}
                   <span className="w-2 h-2 rounded-full bg-blue-400" />
                   <h3 className="text-lg sm:text-xl font-bold font-display text-white">
                     Amostras Essencial
@@ -427,25 +493,14 @@ export default function App() {
                 </button>
               </div>
 
-              {filteredEssencial.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
-                  Nenhum projeto encontrado para "{searchQuery}".
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                  {filteredEssencial.map((project, index) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      index={index}
-                      onPreview={(proj) => setActiveProject(proj)}
-                      onSelectFormat={handleSelectFormat}
-                      onSelectPlan={handleSelectPlan}
-                      onUseAsInspiration={handleUseAsInspiration}
-                    />
-                  ))}
-                </div>
-              )}
+              <ProjectCarouselSection
+                projects={filteredEssencial}
+                emptyMessage={`Nenhum projeto encontrado para "${searchQuery}".`}
+                onPreview={(proj) => setActiveProject(proj)}
+                onSelectFormat={handleSelectFormat}
+                onSelectPlan={handleSelectPlan}
+                onUseAsInspiration={handleUseAsInspiration}
+              />
             </div>
           )}
 
@@ -457,12 +512,25 @@ export default function App() {
               <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-neutral-900 via-neutral-900 to-purple-950/25 border border-purple-500/30 p-5 sm:p-7 lg:p-8 shadow-xl">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-7 items-center">
                   <div className="lg:col-span-7 space-y-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider text-purple-300">
-                      <Sliders className="w-3 h-3" />
-                      <span>Solução Sob Medida</span>
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {activeCategoryTab !== 'todos' && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveCategoryTab('todos')}
+                          className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                          title="Voltar para todas as amostras"
+                          aria-label="Voltar para todas as amostras"
+                        >
+                          <ArrowLeft className="w-4 h-4 text-amber-400" />
+                        </button>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider text-purple-300">
+                        <Sliders className="w-3 h-3" />
+                        <span>Solução Sob Medida</span>
+                      </span>
+                    </div>
 
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold font-display text-white">
+                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold font-display text-white">
                       Projeto Personalizado
                     </h3>
 
@@ -521,6 +589,17 @@ export default function App() {
             <div id="projetos-profissional" className="mb-10 sm:mb-12 scroll-mt-20">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
                 <div className="flex items-center gap-2">
+                  {activeCategoryTab !== 'todos' && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCategoryTab('todos')}
+                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                      title="Voltar para todas as amostras"
+                      aria-label="Voltar para todas as amostras"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-amber-400" />
+                    </button>
+                  )}
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
                   <h3 className="text-lg sm:text-xl font-bold font-display text-white">
                     Amostras Profissional
@@ -540,25 +619,14 @@ export default function App() {
                 </button>
               </div>
 
-              {filteredProfissional.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
-                  Nenhum projeto encontrado para "{searchQuery}".
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                  {filteredProfissional.map((project, index) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      index={index}
-                      onPreview={(proj) => setActiveProject(proj)}
-                      onSelectFormat={handleSelectFormat}
-                      onSelectPlan={handleSelectPlan}
-                      onUseAsInspiration={handleUseAsInspiration}
-                    />
-                  ))}
-                </div>
-              )}
+              <ProjectCarouselSection
+                projects={filteredProfissional}
+                emptyMessage={`Nenhum projeto encontrado para "${searchQuery}".`}
+                onPreview={(proj) => setActiveProject(proj)}
+                onSelectFormat={handleSelectFormat}
+                onSelectPlan={handleSelectPlan}
+                onUseAsInspiration={handleUseAsInspiration}
+              />
             </div>
           )}
 
@@ -569,6 +637,17 @@ export default function App() {
             <div id="projetos-premium" className="mb-6 scroll-mt-20">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800/80">
                 <div className="flex items-center gap-2">
+                  {activeCategoryTab !== 'todos' && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCategoryTab('todos')}
+                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                      title="Voltar para todas as amostras"
+                      aria-label="Voltar para todas as amostras"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-amber-400" />
+                    </button>
+                  )}
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
                   <h3 className="text-lg sm:text-xl font-bold font-display text-white">
                     Amostras Premium
@@ -588,25 +667,14 @@ export default function App() {
                 </button>
               </div>
 
-              {filteredPremium.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-500 bg-neutral-900/40 rounded-2xl border border-neutral-800">
-                  Nenhum projeto encontrado para "{searchQuery}".
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                  {filteredPremium.map((project, index) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      index={index}
-                      onPreview={(proj) => setActiveProject(proj)}
-                      onSelectFormat={handleSelectFormat}
-                      onSelectPlan={handleSelectPlan}
-                      onUseAsInspiration={handleUseAsInspiration}
-                    />
-                  ))}
-                </div>
-              )}
+              <ProjectCarouselSection
+                projects={filteredPremium}
+                emptyMessage={`Nenhum projeto encontrado para "${searchQuery}".`}
+                onPreview={(proj) => setActiveProject(proj)}
+                onSelectFormat={handleSelectFormat}
+                onSelectPlan={handleSelectPlan}
+                onUseAsInspiration={handleUseAsInspiration}
+              />
             </div>
           )}
         </section>
@@ -668,7 +736,7 @@ export default function App() {
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <section className="relative z-10 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
           <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-neutral-800 p-6 sm:p-9 text-center space-y-3.5 shadow-xl">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-display text-white">
               Pronto para ter um site como esses?
             </h2>
             <p className="text-neutral-300 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
@@ -698,7 +766,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer onOpenAdmin={() => setIsAdminView(true)} />
 
       {/* Project Inspector Modal */}
       <ProjectModal
