@@ -9,7 +9,9 @@ import {
   ArrowRight,
   Shield,
   Award,
-  Sliders,
+  ImagePlus,
+  Trash2,
+  Upload,
 } from 'lucide-react';
 
 export type ServiceLevelType =
@@ -20,6 +22,7 @@ export type ServiceLevelType =
 interface ContactModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onBack?: () => void;
   serviceLevel?: ServiceLevelType | null;
   briefingType?: string | null;
 }
@@ -57,7 +60,7 @@ const BRIEFINGS: Record<string, BriefingConfig> = {
       { label: 'Combos', type: 'textarea' },
       { label: 'Preços', type: 'textarea' },
       { label: 'Barbeiros/profissionais', type: 'textarea' },
-      { label: 'Fotos', type: 'textarea' },
+      { label: 'Fotos' },
       { label: 'Logo' },
       { label: 'Outras redes sociais' },
       { label: 'Diferenciais', type: 'textarea' },
@@ -365,32 +368,6 @@ const BRIEFINGS: Record<string, BriefingConfig> = {
       { label: 'Outras informações', type: 'textarea' },
     ],
   },
-
-  Academia: {
-    title: 'Academia',
-    description:
-      'Agora vamos reunir as informações necessárias para apresentar sua academia de forma clara e profissional.',
-    fields: [
-      { label: 'Nome da academia', required: true },
-      { label: 'Responsável' },
-      { label: 'Telefone', type: 'tel' },
-      { label: 'E-mail', type: 'email' },
-      { label: 'Instagram ou outra rede social' },
-      { label: 'Endereço' },
-      { label: 'Horário de funcionamento' },
-      { label: 'Descrição da academia', type: 'textarea' },
-      { label: 'Modalidades e atividades', type: 'textarea' },
-      { label: 'Planos', type: 'textarea' },
-      { label: 'Preços', type: 'textarea' },
-      { label: 'Profissionais/instrutores', type: 'textarea' },
-      { label: 'Estrutura e equipamentos', type: 'textarea' },
-      { label: 'Fotos' },
-      { label: 'Logo' },
-      { label: 'Diferenciais', type: 'textarea' },
-      { label: 'Link da localização', type: 'url' },
-      { label: 'Outras informações', type: 'textarea' },
-    ],
-  },
 };
 
 const DEFAULT_BRIEFING: BriefingConfig = {
@@ -419,6 +396,7 @@ const DEFAULT_BRIEFING: BriefingConfig = {
 export const ContactModal: React.FC<ContactModalProps> = ({
   isOpen,
   onClose,
+  onBack,
   serviceLevel = null,
   briefingType = null,
 }) => {
@@ -426,6 +404,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
+
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const briefing = useMemo(() => {
     if (!briefingType) return DEFAULT_BRIEFING;
@@ -445,6 +427,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setSubmitted(false);
     setStep(0);
     setFormData({});
+    setPhotoFiles([]);
+    setUploadingPhotos(false);
+    setUploadError('');
+
     setMessage(
       briefingType
         ? `Olá! Gostaria de solicitar o briefing para um site de ${briefing.title}.`
@@ -467,6 +453,79 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     }));
   };
 
+  const handlePhotoSelection = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+
+    if (!files.length) return;
+
+    const imageFiles = files.filter((file) =>
+      file.type.startsWith('image/')
+    );
+
+    setPhotoFiles((prev) => [...prev, ...imageFiles]);
+
+    setUploadError('');
+
+    e.target.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadPhotos = async (): Promise<string[]> => {
+    if (!photoFiles.length) return [];
+
+    setUploadingPhotos(true);
+    setUploadError('');
+
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const file of photoFiles) {
+        const formDataToUpload = new FormData();
+        formDataToUpload.append('file', file);
+
+        const response = await fetch('/api/upload-briefing', {
+          method: 'POST',
+          body: formDataToUpload,
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+
+          throw new Error(
+            data?.error || 'Não foi possível enviar uma das imagens.'
+          );
+        }
+
+        const data = await response.json();
+
+        if (!data.url) {
+          throw new Error('O servidor não retornou a URL da imagem.');
+        }
+
+        uploadedUrls.push(data.url);
+      }
+
+      return uploadedUrls;
+    } catch (error) {
+      console.error('Erro no upload das fotos:', error);
+
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível enviar as fotos.'
+      );
+
+      return [];
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
   const handleNext = (e?: React.MouseEvent) => {
     e?.preventDefault();
 
@@ -477,18 +536,39 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setStep((prev) => Math.min(prev + 1, totalSteps - 1));
   };
 
-  const handleBack = () => {
-    if (step > 0) {
-      setStep((prev) => prev - 1);
+  const handleTopBack = () => {
+    if (onBack) {
+      onBack();
     } else {
       onClose();
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleStepBack = () => {
+    if (step > 0) {
+      setStep((prev) => prev - 1);
+    } else {
+      handleTopBack();
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!message.trim()) return;
+    if (!message.trim() || uploadingPhotos) return;
+
+    if (photoFiles.length > 0) {
+      const uploadedUrls = await uploadPhotos();
+
+      if (!uploadedUrls.length) {
+        return;
+      }
+
+      updateField(
+        'Fotos',
+        uploadedUrls.join('\n')
+      );
+    }
 
     setSubmitted(true);
 
@@ -515,6 +595,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   );
 
   const field = currentField;
+  const isPhotoField = field?.label
+    .toLowerCase()
+    .includes('foto');
 
   return (
     <div
@@ -532,9 +615,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         <div className="shrink-0 flex items-center gap-3 px-5 sm:px-7 py-4 border-b border-neutral-800 bg-neutral-900/95 backdrop-blur-xl">
           <button
             type="button"
-            onClick={handleBack}
+            onClick={handleTopBack}
             className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition-colors"
-            aria-label="Voltar para a etapa anterior"
+            aria-label="Voltar para a visão geral"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -614,8 +697,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-neutral-400">
-                Obrigado pelas informações. A NexaWeb poderá analisar os
-                detalhes do seu projeto.
+                Obrigado pelas informações. As fotos selecionadas foram
+                enviadas para o armazenamento do projeto.
               </p>
             </div>
           </div>
@@ -686,7 +769,82 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     )}
                   </label>
 
-                  {field.type === 'textarea' ? (
+                  {isPhotoField ? (
+                    <div className="space-y-3">
+                      <label
+                        htmlFor="briefing-photos"
+                        className="flex flex-col items-center justify-center min-h-[150px] rounded-2xl bg-neutral-950 border border-dashed border-neutral-700 hover:border-amber-400/50 transition-colors cursor-pointer px-5 py-6 text-center"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-3">
+                          <ImagePlus className="w-6 h-6 text-amber-400" />
+                        </div>
+
+                        <span className="text-sm font-semibold text-white">
+                          Selecionar fotos
+                        </span>
+
+                        <span className="mt-1 text-xs text-neutral-500">
+                          Você pode selecionar várias imagens
+                        </span>
+
+                        <input
+                          id="briefing-photos"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoSelection}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {photoFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-neutral-500">
+                            {photoFiles.length}{' '}
+                            {photoFiles.length === 1
+                              ? 'foto selecionada'
+                              : 'fotos selecionadas'}
+                          </p>
+
+                          {photoFiles.map((file, index) => (
+                            <div
+                              key={`${file.name}-${index}`}
+                              className="flex items-center gap-3 p-3 rounded-xl bg-neutral-950 border border-neutral-800"
+                            >
+                              <div className="w-10 h-10 shrink-0 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                <ImagePlus className="w-4 h-4 text-neutral-500" />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs text-white truncate">
+                                  {file.name}
+                                </p>
+
+                                <p className="text-[10px] text-neutral-600 mt-0.5">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(index)}
+                                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                aria-label={`Remover ${file.name}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {uploadError && (
+                        <p className="text-xs text-red-400 leading-5">
+                          {uploadError}
+                        </p>
+                      )}
+                    </div>
+                  ) : field.type === 'textarea' ? (
                     <textarea
                       id="briefing-field"
                       value={formData[field.label] || ''}
@@ -728,7 +886,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 {step > 0 ? (
                   <button
                     type="button"
-                    onClick={handleBack}
+                    onClick={handleStepBack}
                     className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 hover:text-white transition-colors"
                     aria-label="Etapa anterior"
                   >
@@ -754,10 +912,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 ) : (
                   <button
                     type="submit"
-                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 font-bold text-sm transition-all"
+                    disabled={uploadingPhotos}
+                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 disabled:cursor-wait text-neutral-950 font-bold text-sm transition-all"
                   >
-                    <Send className="w-4 h-4" />
-                    Enviar Briefing
+                    {uploadingPhotos ? (
+                      <>
+                        <Upload className="w-4 h-4 animate-pulse" />
+                        Enviando fotos...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Enviar Briefing
+                      </>
+                    )}
                   </button>
                 )}
               </div>
