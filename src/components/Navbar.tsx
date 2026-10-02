@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, ArrowUpRight, Sparkles, HelpCircle } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Sparkles, HelpCircle, Lock } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { navigateTo } from '../router';
 
 interface NavbarProps {
   onOpenContact: (level?: string | null) => void;
@@ -86,13 +87,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleAdminClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     setMobileMenuOpen(false);
-    if (window.location.pathname !== '/admin') {
-      window.history.pushState(null, '', '/admin');
-    }
     if (onOpenAdmin) {
       onOpenAdmin();
     } else {
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      navigateTo('/admin');
     }
   };
 
@@ -217,7 +215,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={handleStart}
-              className="sm:hidden min-h-[38px] px-3.5 py-1.5 rounded-lg bg-amber-400 text-neutral-950 text-xs font-bold shadow-sm"
+              className="sm:hidden min-h-[44px] px-3.5 py-2 rounded-lg bg-amber-400 text-neutral-950 text-xs font-bold shadow-sm inline-flex items-center justify-center"
             >
               Criar site
             </button>
@@ -239,9 +237,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         createPortal(
           <div
             className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
-              mobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
+              mobileMenuOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible'
             }`}
             aria-hidden={!mobileMenuOpen}
+            inert={!mobileMenuOpen ? true : undefined}
           >
             {/* Backdrop that dims the rest of the page and prevents touchmove on background */}
             <div
@@ -303,7 +302,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <a
                     href="#planos"
                     onClick={(e) => handleNavClick(e, 'planos')}
-                    className="text-white flex items-center justify-between p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
+                    className="text-white flex items-center justify-between p-3 min-h-[44px] rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
                   >
                     <span className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-amber-400" />
@@ -385,6 +384,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-neutral-500" />
                   </a>
+
+                  {/* Opção discreta de acesso ao Admin */}
+                  <div className="pt-2 mt-1 border-t border-neutral-900">
+                    <a
+                      href="/admin"
+                      onClick={handleAdminClick}
+                      className="min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900/60 transition-colors text-xs font-medium"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-neutral-500" />
+                      <span>Admin</span>
+                    </a>
+                  </div>
                 </nav>
               </div>
 

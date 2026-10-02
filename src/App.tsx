@@ -422,7 +422,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('todos')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap inline-flex items-center justify-center ${
                   activeCategoryTab === 'todos'
                     ? 'bg-neutral-100 text-neutral-950 shadow-sm'
                     : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
@@ -434,52 +434,52 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('essencial')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5 ${
                   activeCategoryTab === 'essencial'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
                 }`}
               >
-                <Shield className="w-3 h-3 text-blue-300" />
+                <Shield className="w-3.5 h-3.5 text-blue-300" />
                 <span>Essencial ({ESSENCIAL_PROJECTS.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('personalizado')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5 ${
                   activeCategoryTab === 'personalizado'
                     ? 'bg-purple-600 text-white shadow-sm'
                     : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
                 }`}
               >
-                <Sliders className="w-3 h-3 text-purple-300" />
+                <Sliders className="w-3.5 h-3.5 text-purple-300" />
                 <span>Personalizado (Sob Medida)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('profissional')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5 ${
                   activeCategoryTab === 'profissional'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
                 }`}
               >
-                <Award className="w-3 h-3 text-emerald-300" />
+                <Award className="w-3.5 h-3.5 text-emerald-300" />
                 <span>Profissional ({PROFISSIONAL_PROJECTS.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveCategoryTab('premium')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5 ${
                   activeCategoryTab === 'premium'
                     ? 'bg-amber-400 text-neutral-950 shadow-sm'
                     : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
                 }`}
               >
-                <Sparkles className="w-3 h-3 text-amber-500" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>Premium ({PREMIUM_PROJECTS.length})</span>
               </button>
             </div>
@@ -515,10 +515,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSelectPlan('Essencial')}
-                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-1"
+                  className="min-h-[44px] text-xs text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-blue-500/10 transition-colors"
                 >
                   <span>Ver plano Essencial</span>
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -546,7 +546,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setActiveCategoryTab('todos')}
-                          className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                          className="min-w-[44px] min-h-[44px] p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1 flex items-center justify-center"
                           title="Voltar para todas as amostras"
                           aria-label="Voltar para todas as amostras"
                         >
@@ -622,7 +622,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setActiveCategoryTab('todos')}
-                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                      className="min-w-[44px] min-h-[44px] p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1 flex items-center justify-center"
                       title="Voltar para todas as amostras"
                       aria-label="Voltar para todas as amostras"
                     >
@@ -644,21 +644,21 @@ export default function App() {
                       e.preventDefault();
                       navigateTo('/admin');
                     }}
-                    className="p-1 rounded text-neutral-700 hover:text-emerald-400 transition-colors opacity-30 hover:opacity-100 ml-0.5 inline-flex items-center"
+                    className="min-w-[44px] min-h-[44px] p-2 rounded text-neutral-700 hover:text-emerald-400 transition-colors opacity-40 hover:opacity-100 ml-0.5 inline-flex items-center justify-center"
                     title="Acesso Administrativo"
                     aria-label="Acesso Administrativo"
                   >
-                    <Lock className="w-3 h-3" />
+                    <Lock className="w-3.5 h-3.5" />
                   </a>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleSelectPlan('Profissional')}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1"
+                  className="min-h-[44px] text-xs text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-emerald-500/10 transition-colors"
                 >
                   <span>Ver plano Profissional</span>
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -684,7 +684,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setActiveCategoryTab('todos')}
-                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1"
+                      className="min-w-[44px] min-h-[44px] p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors mr-1 flex items-center justify-center"
                       title="Voltar para todas as amostras"
                       aria-label="Voltar para todas as amostras"
                     >
@@ -703,10 +703,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSelectPlan('Premium')}
-                  className="text-xs text-amber-400 hover:text-amber-300 font-semibold inline-flex items-center gap-1"
+                  className="min-h-[44px] text-xs text-amber-400 hover:text-amber-300 font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-amber-500/10 transition-colors"
                 >
                   <span>Ver plano Premium</span>
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 

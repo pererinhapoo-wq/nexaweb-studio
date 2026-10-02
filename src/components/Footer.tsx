@@ -29,7 +29,7 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
                 href={NEXAWEB_CONTACT.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border border-purple-500/25 text-xs font-semibold text-neutral-200 hover:text-white transition-all hover:scale-[1.02]"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border border-purple-500/25 text-xs font-semibold text-neutral-200 hover:text-white transition-all hover:scale-[1.02]"
               >
                 <Instagram className="w-3.5 h-3.5 text-pink-400" />
                 <span>Instagram Oficial @nexaw1</span>
@@ -116,9 +116,9 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
             <div className="pt-2">
               <a
                 href="#personalizado"
-                className="text-xs text-purple-400 hover:text-purple-300 font-semibold inline-flex items-center gap-1"
+                className="text-xs text-purple-400 hover:text-purple-300 font-semibold inline-flex items-center gap-1.5 py-1.5 min-h-[40px]"
               >
-                <Sliders className="w-3 h-3" />
+                <Sliders className="w-3.5 h-3.5" />
                 <span>Plano Personalizado</span>
               </a>
             </div>

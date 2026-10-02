@@ -96,10 +96,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <button
             type="button"
             onClick={() => onPreview(project)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/60 transition-colors shadow-sm"
+            className="min-h-[40px] sm:min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/60 transition-colors shadow-sm"
             title="Ver detalhes do projeto"
           >
-            <Eye className="w-3 h-3 text-amber-400" />
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
             <span>Detalhes</span>
           </button>
         </div>
@@ -148,7 +148,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 onPreview(project);
               }
             }}
-            className={`flex-1 min-h-[42px] sm:min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-[0.98] ${buttonGradientClass}`}
+            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-[0.98] ${buttonGradientClass}`}
           >
             <span>Quero um site deste formato</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -160,7 +160,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               href={project.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[38px] sm:min-h-[44px] px-3 sm:px-3.5 py-1.5 sm:py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
               title="Abrir demonstração no ar"
             >
               <span>Ver site no ar</span>
@@ -170,7 +170,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             <button
               type="button"
               onClick={() => onPreview(project)}
-              className="min-h-[38px] sm:min-h-[44px] px-3 sm:px-3.5 py-1.5 sm:py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
+              className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center justify-center gap-1 transition-colors active:scale-[0.98]"
             >
               <span>Detalhes</span>
               <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
@@ -182,9 +182,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <button
             type="button"
             onClick={() => onUseAsInspiration(project)}
-            className="w-full min-h-[34px] sm:min-h-[36px] py-1 sm:py-1.5 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 text-[10px] sm:text-[11px] font-semibold text-purple-300 hover:text-purple-200 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
+            className="w-full min-h-[42px] sm:min-h-[38px] py-2 sm:py-1.5 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 text-[11px] sm:text-xs font-semibold text-purple-300 hover:text-purple-200 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
           >
-            <Sparkles className="w-3 h-3 text-purple-400" />
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
             <span>Usar este projeto como inspiração</span>
           </button>
         )}
