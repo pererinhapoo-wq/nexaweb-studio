@@ -1,8 +1,9 @@
 import React from 'react';
-import { ArrowUpRight, Shield, Sparkles, Award, Sliders, CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, Shield, Sparkles, Award, Sliders, CheckCircle2, Instagram, Lock } from 'lucide-react';
 import { ESSENCIAL_PROJECTS, PROFISSIONAL_PROJECTS, PREMIUM_PROJECTS } from '../data/projects';
+import { NEXAWEB_CONTACT } from '../config/contact';
 
-export const Footer: React.FC = () => {
+export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) => {
   return (
     <footer className="border-t border-neutral-800/80 bg-neutral-950 text-neutral-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
@@ -19,8 +20,22 @@ export const Footer: React.FC = () => {
             </div>
 
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed max-w-sm">
-              Desenvolvimento de sites profissionais para diferentes segmentos. 22 demonstrações no ar nas categorias Essencial, Personalizado, Profissional e Premium.
+              Desenvolvimento de sites profissionais para diferentes segmentos. 22 projetos no portfólio oficial (15 demonstrações reais no ar nas categorias Essencial, Personalizado, Profissional e Premium).
             </p>
+
+            {/* Official Instagram Channel */}
+            <div className="pt-1">
+              <a
+                href={NEXAWEB_CONTACT.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border border-purple-500/25 text-xs font-semibold text-neutral-200 hover:text-white transition-all hover:scale-[1.02]"
+              >
+                <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                <span>Instagram Oficial @nexaw1</span>
+                <ArrowUpRight className="w-3 h-3 text-neutral-500" />
+              </a>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-neutral-400">
               <span className="flex items-center gap-1 text-blue-400">
@@ -54,15 +69,19 @@ export const Footer: React.FC = () => {
             <ul className="space-y-1.5 text-xs">
               {ESSENCIAL_PROJECTS.slice(0, 5).map((p) => (
                 <li key={p.id}>
-                  <a
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-blue-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-blue-400 shrink-0" />
-                  </a>
+                  {p.url && p.url !== '#' ? (
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-blue-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-blue-400 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="text-neutral-500 truncate block">{p.name}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -77,15 +96,19 @@ export const Footer: React.FC = () => {
             <ul className="space-y-1.5 text-xs">
               {PROFISSIONAL_PROJECTS.map((p) => (
                 <li key={p.id}>
-                  <a
-                    href={p.url && p.url !== '#' ? p.url : '#planos'}
-                    target={p.url && p.url !== '#' ? '_blank' : undefined}
-                    rel="noopener noreferrer"
-                    className="hover:text-emerald-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-emerald-400 shrink-0" />
-                  </a>
+                  {p.url && p.url !== '#' ? (
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-emerald-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-emerald-400 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="text-neutral-500 truncate block">{p.name}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -110,15 +133,19 @@ export const Footer: React.FC = () => {
             <ul className="space-y-1.5 text-xs">
               {PREMIUM_PROJECTS.slice(0, 5).map((p) => (
                 <li key={p.id}>
-                  <a
-                    href={p.url && p.url !== '#' ? p.url : '#planos'}
-                    target={p.url && p.url !== '#' ? '_blank' : undefined}
-                    rel="noopener noreferrer"
-                    className="hover:text-amber-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-amber-400 shrink-0" />
-                  </a>
+                  {p.url && p.url !== '#' ? (
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-amber-300 transition-colors inline-flex items-center gap-1 group truncate max-w-full"
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <ArrowUpRight className="w-3 h-3 text-neutral-600 group-hover:text-amber-400 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="text-neutral-500 truncate block">{p.name}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -133,6 +160,19 @@ export const Footer: React.FC = () => {
               <CheckCircle2 className="w-3.5 h-3.5" />
               Plataformas Seguras & Otimizadas
             </span>
+            <span>·</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenAdmin) onOpenAdmin();
+                else window.location.hash = 'admin';
+              }}
+              className="text-neutral-500 hover:text-neutral-300 inline-flex items-center gap-1 transition-colors"
+              title="Acesso operacional interno"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Painel Interno</span>
+            </button>
           </div>
         </div>
       </div>

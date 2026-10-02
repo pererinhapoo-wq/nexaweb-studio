@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Sparkles,
@@ -8,6 +9,8 @@ import {
   Shield,
   Layers,
 } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface StartProjectModalProps {
   isOpen: boolean;
@@ -24,19 +27,36 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
   onChooseCustomIdea,
   onChoosePlanDirectly,
 }) => {
-  if (!isOpen) return null;
+  const modalRef = useRef<HTMLDivElement>(null);
 
-  return (
+  useScrollLock(isOpen);
+  useModalA11y({
+    isOpen,
+    onClose,
+    containerRef: modalRef,
+  });
+
+  if (!isOpen || typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[65] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
     >
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-lg max-h-[92vh] bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950/80">
+        <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950/80 z-20">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
               <Sparkles className="w-4 h-4" />
@@ -160,6 +180,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

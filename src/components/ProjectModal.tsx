@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ExternalLink,
@@ -10,8 +11,11 @@ import {
   Smartphone,
   Globe,
   ArrowRight,
+  Info,
 } from 'lucide-react';
 import type { ProjectItem } from '../data/projects';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface ProjectModalProps {
   project: ProjectItem | null;
@@ -30,22 +34,23 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   onSelectFormat,
   onUseAsInspiration,
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  
+  useScrollLock(!!project);
+  useModalA11y({
+    isOpen: !!project,
+    onClose,
+    containerRef: modalRef,
+  });
 
   useEffect(() => {
     if (project) {
       setViewMode('desktop');
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
     }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [project]);
 
-  if (!project) return null;
+  if (!project || typeof document === 'undefined') return null;
 
   const isPremium = project.tier === 'Premium';
   const isProfissional = project.tier === 'Profissional';
@@ -75,18 +80,28 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-label={`Visão geral do projeto ${project.name}`}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
     >
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-neutral-950 border border-neutral-800 rounded-3xl shadow-2xl text-neutral-100 flex flex-col">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-5xl max-h-[92vh] bg-neutral-950 border border-neutral-800 rounded-3xl shadow-2xl text-neutral-100 flex flex-col overflow-hidden outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* HEADER */}
-        <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 bg-neutral-950/95 backdrop-blur-xl border-b border-neutral-800">
+        <div className="shrink-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 bg-neutral-950/95 backdrop-blur-xl border-b border-neutral-800">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span
@@ -104,6 +119,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="shrink-0 p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
             aria-label="Fechar"
@@ -112,7 +128,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           </button>
         </div>
 
-        <div className="p-4 sm:p-6 lg:p-7 space-y-6">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:p-7 space-y-6"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {/* PREVIEW */}
           <section>
             <div className="flex items-center justify-between gap-3 mb-2.5">
@@ -124,6 +143,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               {isRealUrl && (
                 <div className="flex items-center gap-1 p-1 rounded-xl bg-neutral-900 border border-neutral-800">
                   <button
+                    type="button"
                     onClick={() => setViewMode('desktop')}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                       viewMode === 'desktop'
@@ -136,6 +156,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setViewMode('mobile')}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                       viewMode === 'mobile'
@@ -258,7 +279,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   Você pode escolher exatamente este formato ou personalizá-lo.
                 </p>
 
-                {isRealUrl && (
+                {isRealUrl ? (
                   <a
                     href={project.url}
                     target="_blank"
@@ -268,6 +289,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     <span>Ver site no ar</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
+                ) : (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-neutral-950/80 border border-neutral-800 text-[11px] text-neutral-400">
+                    <Info className="w-3.5 h-3.5 text-neutral-500 shrink-0 mt-0.5" />
+                    <span>Projeto conceito de portfólio. Solicite este mesmo padrão para o seu site.</span>
+                  </div>
                 )}
 
                 <button
@@ -297,6 +323,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           </section>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

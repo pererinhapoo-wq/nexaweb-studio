@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Sparkles,
@@ -12,6 +13,8 @@ import {
 } from 'lucide-react';
 import type { PlanId } from './PlanDetailModal';
 import { PLANS_DATA } from './PlanDetailModal';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface PlanAdvisorModalProps {
   isOpen: boolean;
@@ -89,11 +92,17 @@ export const PlanAdvisorModal: React.FC<PlanAdvisorModalProps> = ({
   onClose,
   onSelectPlan,
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<PlanId[]>([]);
   const [recommendedPlan, setRecommendedPlan] = useState<PlanId | null>(null);
 
-  if (!isOpen) return null;
+  useScrollLock(isOpen);
+  useModalA11y({
+    isOpen,
+    onClose,
+    containerRef: modalRef,
+  });
 
   const handleSelectOption = (plan: PlanId) => {
     const nextAnswers = [...answers];
@@ -137,15 +146,25 @@ export const PlanAdvisorModal: React.FC<PlanAdvisorModalProps> = ({
 
   const planInfo = recommendedPlan ? PLANS_DATA[recommendedPlan] : null;
 
-  return (
+  if (!isOpen || typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
     >
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col max-h-[90vh]">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col max-h-[92vh] outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 sm:px-7 py-4 border-b border-neutral-800 bg-neutral-950/80">
           <div className="flex items-center gap-2">
@@ -296,6 +315,7 @@ export const PlanAdvisorModal: React.FC<PlanAdvisorModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

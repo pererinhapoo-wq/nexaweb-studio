@@ -51,7 +51,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-16 sm:h-18">
           {/* Logo & Brand Identity */}
           <div className="flex items-center gap-3">
-            <a href="#" className="flex items-center gap-2.5 group">
+            <a
+              href="#inicio"
+              onClick={(e) => {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="flex items-center gap-2.5 group"
+            >
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-neutral-900 p-[1px] shadow-md shadow-amber-500/10 group-hover:shadow-amber-500/25 transition-all">
                 <div className="w-full h-full bg-neutral-950 rounded-[11px] flex items-center justify-center">
                   <span className="font-display font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-500 text-base sm:text-lg">

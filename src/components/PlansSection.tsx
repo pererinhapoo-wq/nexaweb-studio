@@ -15,7 +15,7 @@ import { PlanDetailModal, PLANS_DATA } from './PlanDetailModal';
 import { PlanAdvisorModal } from './PlanAdvisorModal';
 
 interface PlansSectionProps {
-  onSelectPlan: (planId: PlanId) => void;
+  onSelectPlan: (planId: PlanId, startAtBriefing?: boolean) => void;
 }
 
 export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
@@ -76,11 +76,11 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
               }
             : isProfissional
             ? {
-                border: 'border-neutral-800 hover:border-emerald-500/50',
-                badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-                btn: 'bg-gradient-to-r from-emerald-400 to-teal-300 text-neutral-950 hover:from-emerald-300 hover:to-teal-200 shadow-emerald-500/15',
-                icon: <Award className="w-4 h-4 text-emerald-400" />,
-                accentText: 'text-emerald-400',
+                border: 'border-neutral-800 hover:border-orange-500/50',
+                badge: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
+                btn: 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 text-neutral-950 hover:brightness-105 shadow-orange-500/15',
+                icon: <Award className="w-4 h-4 text-orange-400" />,
+                accentText: 'text-orange-400',
               }
             : isPersonalizado
             ? {
@@ -119,9 +119,14 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
 
                 {/* Plan Name & Tagline */}
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
-                    {plan.name}
-                  </h3>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                      {plan.name}
+                    </h3>
+                    <span className="text-xs sm:text-sm font-extrabold text-neutral-200">
+                      {plan.price}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-neutral-400 leading-relaxed line-clamp-2">
                     {plan.tagline}
                   </p>
@@ -155,13 +160,13 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
                   <span>Ver o que está incluído</span>
                 </button>
 
-                {/* Choose Plan Button */}
+                {/* Choose Plan Button - Opens presentation first as required */}
                 <button
                   type="button"
-                  onClick={() => onSelectPlan(planId)}
+                  onClick={() => setDetailModalPlan(planId)}
                   className={`w-full min-h-[44px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${cardTheme.btn}`}
                 >
-                  <span>Escolher {plan.name}</span>
+                  <span>Conhecer {plan.name}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -170,13 +175,13 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
         })}
       </div>
 
-      {/* Plan Details Modal */}
+      {/* Plan Details Presentation Modal */}
       <PlanDetailModal
         planId={detailModalPlan}
         onClose={() => setDetailModalPlan(null)}
         onSelectPlan={(id) => {
           setDetailModalPlan(null);
-          onSelectPlan(id);
+          onSelectPlan(id, true);
         }}
       />
 

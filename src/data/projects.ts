@@ -261,7 +261,7 @@ export const ESSENCIAL_PROJECTS: ProjectItem[] = [
     name: 'Restaurante',
     category: 'Restaurante',
     tier: 'Essencial',
-    url: 'https://grok-workspace-puce.vercel.app/',
+    url: '',
     description:
       'Site profissional para restaurantes apresentarem seu espaço, cardápio, pratos e canais de contato.',
     fallbackImage: '',
@@ -414,7 +414,7 @@ export const ESSENCIAL_PROJECTS: ProjectItem[] = [
     name: 'Projeto Grok Workspace',
     category: 'Tecnologia',
     tier: 'Essencial',
-    url: '#',
+    url: '',
     description:
       'Projeto demonstrativo desenvolvido para explorar uma experiência digital moderna.',
     fallbackImage: '',
@@ -445,7 +445,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'NOVA ARQ',
     category: 'Arquitetura',
     tier: 'Profissional',
-    url: '#',
+    url: '',
     description:
       'Projeto profissional desenvolvido para uma apresentação mais completa e sofisticada de serviços de arquitetura.',
     fallbackImage: '',
@@ -476,7 +476,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'LUMIÈRE',
     category: 'Clínica / Saúde',
     tier: 'Profissional',
-    url: '#',
+    url: '',
     description:
       'Projeto profissional para uma apresentação elegante de serviços, informações e atendimento.',
     fallbackImage: '',
@@ -507,7 +507,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'VERTEX DIGITAL',
     category: 'Tecnologia',
     tier: 'Profissional',
-    url: '#',
+    url: '',
     description:
       'Projeto profissional para empresas de tecnologia que precisam apresentar soluções e serviços de forma clara.',
     fallbackImage: '',
@@ -695,7 +695,7 @@ export const PREMIUM_PROJECTS: ProjectItem[] = [
     name: 'Restaurante Premium',
     category: 'Restaurante',
     tier: 'Premium',
-    url: '#',
+    url: '',
     description:
       'Projeto premium para restaurantes apresentarem sua experiência, cardápio e identidade.',
     fallbackImage: '',
@@ -726,7 +726,7 @@ export const PREMIUM_PROJECTS: ProjectItem[] = [
     name: 'King’s Barber Premium',
     category: 'Barbearia',
     tier: 'Premium',
-    url: '#',
+    url: '',
     description:
       'Projeto premium para barbearias apresentarem seus serviços, ambiente e identidade de forma sofisticada.',
     fallbackImage: '',
@@ -758,3 +758,22 @@ export const ALL_PROJECTS: ProjectItem[] = [
   ...PROFISSIONAL_PROJECTS,
   ...PREMIUM_PROJECTS,
 ];
+
+/**
+ * Verifica com precisão se o projeto possui uma demonstração real publicada na web
+ */
+export function isProjectPublished(project: ProjectItem): boolean {
+  return Boolean(
+    project.url &&
+    project.url !== '#' &&
+    (project.url.startsWith('http://') || project.url.startsWith('https://'))
+  );
+}
+
+/**
+ * Contadores oficiais reais do portfólio da NexaWeb
+ */
+export const TOTAL_PROJECTS_COUNT = ALL_PROJECTS.length; // 22 projetos
+export const PUBLISHED_PROJECTS_COUNT = ALL_PROJECTS.filter(isProjectPublished).length; // 15 sites reais no ar
+export const CONCEPT_PROJECTS_COUNT = TOTAL_PROJECTS_COUNT - PUBLISHED_PROJECTS_COUNT; // 7 projetos em homologação
+

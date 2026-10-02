@@ -20,9 +20,26 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Lightbulb,
+  Check,
+  Layout,
+  Database,
+  Activity,
+  Clock,
+  ShieldCheck,
+  BarChart3,
+  Users,
+  Cpu,
+  Sliders,
+  Zap,
 } from 'lucide-react';
 import { ALL_PROJECTS, type ProjectItem } from '../data/projects';
 import { ProjectCard } from './ProjectCard';
+import {
+  FEATURE_CATALOG,
+  findSegmentPreset,
+  type SegmentPreset,
+  type FeatureItem,
+} from '../data/featureCatalog';
 
 export interface SegmentsShowcaseProps {
   onSelectFormat?: (project: ProjectItem) => void;
@@ -192,6 +209,409 @@ export const SEGMENTS: SegmentItem[] = [
   },
 ];
 
+interface SegmentFeaturesExplorerProps {
+  preset: SegmentPreset;
+  segmentName: string;
+  onStartCustomProject?: (segmentName?: string) => void;
+}
+
+const SegmentFeaturesExplorer: React.FC<SegmentFeaturesExplorerProps> = ({
+  preset,
+  segmentName,
+  onStartCustomProject,
+}) => {
+  const [activeTab, setActiveTab] = useState<
+    'features' | 'structure' | 'advanced' | 'realtime' | 'metrics'
+  >('features');
+
+  const hasRealtime = preset.realtimeFeatures && preset.realtimeFeatures.length > 0;
+  const hasStats = Boolean(preset.statsExample);
+  const hasAdvanced =
+    (preset.advancedFeatures && preset.advancedFeatures.length > 0) || Boolean(preset.accountRoles);
+
+  return (
+    <div className="rounded-2xl sm:rounded-3xl bg-neutral-900/80 border border-neutral-800 p-4 sm:p-6 lg:p-7 space-y-6">
+      {/* Explorer Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+        <div>
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+            <Cpu className="w-3.5 h-3.5" />
+            <span>Catálogo de Recursos & Arquitetura</span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+            Estrutura & Recursos Planejados para {segmentName}
+          </h3>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Abaixo estão as seções, ferramentas comerciais e módulos técnicos desenhados para este segmento.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (onStartCustomProject) {
+              onStartCustomProject(segmentName);
+            }
+          }}
+          className="min-h-[40px] px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-105 text-neutral-950 font-bold text-xs shadow-md shadow-amber-400/15 transition-all inline-flex items-center justify-center gap-1.5 shrink-0 active:scale-[0.98]"
+        >
+          <span>Personalizar no Briefing</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Navigation Sub-Tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800/80 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('features')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            activeTab === 'features'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm font-bold'
+              : 'bg-neutral-950 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Funcionalidades ({preset.standardFeatures.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('structure')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            activeTab === 'structure'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm font-bold'
+              : 'bg-neutral-950 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+          }`}
+        >
+          <Layout className="w-3.5 h-3.5" />
+          <span>Estrutura do Site ({preset.defaultStructure.length})</span>
+        </button>
+
+        {hasAdvanced && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('advanced')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === 'advanced'
+                ? 'bg-amber-400 text-neutral-950 shadow-sm font-bold'
+                : 'bg-neutral-950 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Módulos de Sistema & Contas ({preset.advancedFeatures.length})</span>
+          </button>
+        )}
+
+        {hasRealtime && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('realtime')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === 'realtime'
+                ? 'bg-amber-400 text-neutral-950 shadow-sm font-bold'
+                : 'bg-neutral-950 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Tempo Real ({preset.realtimeFeatures.length})</span>
+          </button>
+        )}
+
+        {hasStats && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('metrics')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === 'metrics'
+                ? 'bg-amber-400 text-neutral-950 shadow-sm font-bold'
+                : 'bg-neutral-950 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Métricas & Desempenho</span>
+          </button>
+        )}
+      </div>
+
+      {/* Tab 1: Standard Features */}
+      {activeTab === 'features' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {preset.standardFeatures.map((featId) => {
+            const feat = FEATURE_CATALOG[featId];
+            if (!feat) return null;
+
+            const complexityColor =
+              feat.complexity === 'Básica'
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                : feat.complexity === 'Intermediária'
+                ? 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                : feat.complexity === 'Avançada'
+                ? 'text-purple-400 bg-purple-500/10 border-purple-500/30'
+                : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+            return (
+              <div
+                key={featId}
+                className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/80 hover:border-neutral-700 transition-all flex flex-col justify-between space-y-2.5"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${complexityColor}`}
+                    >
+                      {feat.complexity}
+                    </span>
+                    <span className="text-[10px] font-mono text-neutral-500">
+                      {feat.compatiblePlans[0] || 'Todos os planos'}
+                    </span>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
+                    {feat.name}
+                  </h4>
+                  <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                    {feat.shortDesc}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-neutral-800/60 flex items-center justify-between text-[10px] text-neutral-500">
+                  <span>Planos compatíveis:</span>
+                  <span className="text-neutral-300 font-medium truncate max-w-[150px]">
+                    {feat.compatiblePlans.join(', ')}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Tab 2: Recommended Site Structure */}
+      {activeTab === 'structure' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {preset.defaultStructure.map((sec, idx) => (
+            <div
+              key={sec}
+              className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-center gap-3"
+            >
+              <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-xs font-mono font-bold text-amber-400 shrink-0">
+                {String(idx + 1).padStart(2, '0')}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-xs sm:text-sm font-semibold text-white block truncate">
+                  {sec}
+                </span>
+                <span className="text-[10px] text-neutral-500 block truncate">
+                  Seção planejada para {segmentName}
+                </span>
+              </div>
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tab 3: Advanced System & Roles */}
+      {activeTab === 'advanced' && (
+        <div className="space-y-6">
+          {/* Advanced Features List */}
+          {preset.advancedFeatures && preset.advancedFeatures.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-2">
+                <Database className="w-3.5 h-3.5 text-amber-400" />
+                <span>Módulos de Sistema & Painéis</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {preset.advancedFeatures.map((featId) => {
+                  const feat = FEATURE_CATALOG[featId];
+                  if (!feat) return null;
+                  return (
+                    <div
+                      key={featId}
+                      className="p-3.5 rounded-xl bg-neutral-950 border border-purple-500/20 hover:border-purple-500/40 transition-all space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md">
+                          Módulo Avançado
+                        </span>
+                        <span className="text-[10px] font-mono text-neutral-500">
+                          Personalizado / Premium
+                        </span>
+                      </div>
+                      <h5 className="text-xs sm:text-sm font-bold text-white">{feat.name}</h5>
+                      <p className="text-[11px] text-neutral-400 leading-relaxed">
+                        {feat.shortDesc}
+                      </p>
+
+                      <div className="pt-2 border-t border-neutral-800/80 flex flex-wrap gap-1.5">
+                        {feat.requiresAuth && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">
+                            Login / Senha
+                          </span>
+                        )}
+                        {feat.requiresDatabase && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">
+                            Banco de Dados
+                          </span>
+                        )}
+                        {feat.requiresBackend && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">
+                            Backend / API
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Account Roles & Permissions */}
+          {preset.accountRoles && (
+            <div className="space-y-3 pt-4 border-t border-neutral-800/80">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-blue-400" />
+                <span>Níveis de Acesso e Perfis (Arquitetura de Contas)</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Cliente / Usuário */}
+                <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white">
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
+                    <span>{preset.accountRoles.cliente.label}</span>
+                  </div>
+                  <ul className="space-y-1.5 text-[11px] text-neutral-400">
+                    {preset.accountRoles.cliente.capabilities.map((cap, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <Check className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                        <span>{cap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Profissional / Operação */}
+                <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span>{preset.accountRoles.profissional.label}</span>
+                  </div>
+                  <ul className="space-y-1.5 text-[11px] text-neutral-400">
+                    {preset.accountRoles.profissional.capabilities.map((cap, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <Check className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span>{cap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Administrador / Gestão */}
+                <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white">
+                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    <span>{preset.accountRoles.administrador.label}</span>
+                  </div>
+                  <ul className="space-y-1.5 text-[11px] text-neutral-400">
+                    {preset.accountRoles.administrador.capabilities.map((cap, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <Check className="w-3 h-3 text-purple-400 shrink-0 mt-0.5" />
+                        <span>{cap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 4: Realtime Features */}
+      {activeTab === 'realtime' && hasRealtime && (
+        <div className="space-y-3">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+            <Activity className="w-4 h-4 shrink-0 animate-pulse text-amber-400" />
+            <span>
+              Recursos com atualização instantânea para clientes, profissionais e gestão de {segmentName}.
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {preset.realtimeFeatures.map((featId) => {
+              const feat = FEATURE_CATALOG[featId];
+              if (!feat) return null;
+              return (
+                <div
+                  key={featId}
+                  className="p-3.5 rounded-xl bg-neutral-950 border border-amber-500/30 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-400">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span>Tempo Real</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-neutral-500">WebSocket / Polling</span>
+                  </div>
+                  <h5 className="text-xs sm:text-sm font-bold text-white">{feat.name}</h5>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">{feat.shortDesc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Performance / Metrics Example */}
+      {activeTab === 'metrics' && hasStats && preset.statsExample && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-neutral-800">
+            <div>
+              <h4 className="text-sm font-bold text-white">{preset.statsExample.title}</h4>
+              <p className="text-[11px] text-neutral-400">
+                Modelo visual do painel de controle que seus clientes ou gestores visualizam.
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-950 text-neutral-500 border border-neutral-800 shrink-0">
+              Demonstração de Interface
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {preset.statsExample.metrics.map((metric, i) => (
+              <div
+                key={i}
+                className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1 text-center sm:text-left"
+              >
+                <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider block">
+                  {metric.label}
+                </span>
+                <span className="text-lg sm:text-2xl font-extrabold font-display text-amber-300 block">
+                  {metric.value}
+                </span>
+                {metric.detail && (
+                  <span className="text-[10px] text-neutral-500 block truncate">
+                    {metric.detail}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-400 flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <p>
+              {preset.statsExample.note ||
+                'Demonstração da estrutura de dados e métricas projetada para este segmento. Ao integrar com banco de dados real, estas informações são atualizadas dinamicamente para cada usuário.'}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
   onSelectFormat,
   onPreviewProject,
@@ -224,6 +644,11 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
     const targetIds = SEGMENT_PROJECT_IDS[activeSegmentId] || [];
     return ALL_PROJECTS.filter((p) => targetIds.includes(p.id));
   }, [activeSegmentId]);
+
+  const currentPreset = useMemo(() => {
+    if (!currentSegment) return null;
+    return findSegmentPreset(currentSegment.id);
+  }, [currentSegment]);
 
   const handleSelectSegment = (segmentId: string | null) => {
     setInternalSegmentId(segmentId);
@@ -329,6 +754,17 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
                 ))}
               </div>
 
+              {/* Technical Catalog & Features Explorer for this Segment */}
+              {currentPreset && (
+                <div className="pt-2">
+                  <SegmentFeaturesExplorer
+                    preset={currentPreset}
+                    segmentName={currentSegment.name}
+                    onStartCustomProject={onStartCustomProject}
+                  />
+                </div>
+              )}
+
               {/* Bottom bar inside category view */}
               <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-neutral-900/60 border border-neutral-800/80 rounded-2xl p-4 sm:p-5">
                 <div className="space-y-0.5">
@@ -367,66 +803,79 @@ export const SegmentsShowcase: React.FC<SegmentsShowcaseProps> = ({
             </div>
           ) : (
             /* ESTADO VAZIO PROFISSIONAL (Não é erro, é oportunidade de criação) */
-            <div className="p-6 sm:p-10 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-neutral-900 via-neutral-900/90 to-neutral-950 border border-neutral-800 text-center space-y-5 max-w-2xl mx-auto shadow-xl">
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 mx-auto">
-                {currentSegment.icon}
+            <div className="space-y-6">
+              <div className="p-6 sm:p-10 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-neutral-900 via-neutral-900/90 to-neutral-950 border border-neutral-800 text-center space-y-5 max-w-2xl mx-auto shadow-xl">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 mx-auto">
+                  {currentSegment.icon}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+                    Ainda não temos uma demonstração publicada para este segmento.
+                  </h3>
+                  <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-lg mx-auto">
+                    Mas podemos criar um projeto sob medida para sua empresa.
+                  </p>
+                  <p className="text-xs text-neutral-400 leading-relaxed max-w-md mx-auto">
+                    Desenvolvemos a estrutura visual ideal para {currentSegment.name}, com seções personalizadas, identidade marcante e foco em resultados.
+                  </p>
+                </div>
+
+                {/* Differential bullets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left max-w-md mx-auto py-2">
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Design 100% exclusivo</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Adaptação total para celular</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Integração com WhatsApp</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Briefing guiado e suporte</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onStartCustomProject) {
+                        onStartCustomProject(currentSegment.name);
+                      }
+                    }}
+                    className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 hover:brightness-105 text-neutral-950 font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>Solicitar projeto</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSegment(null)}
+                    className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Voltar para tipos de sites</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-lg sm:text-xl font-bold font-display text-white">
-                  Ainda não temos uma demonstração publicada para este segmento.
-                </h3>
-                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-lg mx-auto">
-                  Mas podemos criar um projeto sob medida para sua empresa.
-                </p>
-                <p className="text-xs text-neutral-400 leading-relaxed max-w-md mx-auto">
-                  Desenvolvemos a estrutura visual ideal para {currentSegment.name}, com seções personalizadas, identidade marcante e foco em resultados.
-                </p>
-              </div>
-
-              {/* Differential bullets */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left max-w-md mx-auto py-2">
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Design 100% exclusivo</span>
+              {/* Technical Catalog & Features Explorer for Segments without live demo */}
+              {currentPreset && (
+                <div className="pt-2 max-w-5xl mx-auto">
+                  <SegmentFeaturesExplorer
+                    preset={currentPreset}
+                    segmentName={currentSegment.name}
+                    onStartCustomProject={onStartCustomProject}
+                  />
                 </div>
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Adaptação total para celular</span>
-                </div>
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Integração com WhatsApp</span>
-                </div>
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/80 text-xs text-neutral-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Briefing guiado e suporte</span>
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onStartCustomProject) {
-                      onStartCustomProject(currentSegment.name);
-                    }
-                  }}
-                  className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 hover:brightness-105 text-neutral-950 font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Solicitar projeto</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSelectSegment(null)}
-                  className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Voltar para tipos de sites</span>
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>

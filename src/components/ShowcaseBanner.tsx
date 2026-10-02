@@ -42,6 +42,7 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [hasBannerError, setHasBannerError] = useState(false);
 
   const currentProject = showcaseProjects[currentIndex] || showcaseProjects[0];
   const nextIndex = (currentIndex + 1) % showcaseProjects.length;
@@ -63,11 +64,13 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
 
   // Preload NEXT image only (avoids loading all simultaneously)
   useEffect(() => {
+    setImageLoaded(false);
+    setHasBannerError(false);
     if (nextScreenshot) {
       const img = new Image();
       img.src = nextScreenshot;
     }
-  }, [nextScreenshot]);
+  }, [nextScreenshot, currentIndex]);
 
   // Handle slide step
   const handleNext = useCallback(() => {
@@ -285,7 +288,7 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
 
             {/* Screen Content */}
             <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg bg-neutral-900 mt-2">
-              {currentScreenshot ? (
+              {currentScreenshot && !hasBannerError ? (
                 <>
                   <img
                     key={currentProject.id}
@@ -293,6 +296,7 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
                     alt={`Prévia do projeto ${currentProject.name}`}
                     loading="eager"
                     onLoad={() => setImageLoaded(true)}
+                    onError={() => setHasBannerError(true)}
                     className={`w-full h-full object-cover object-top transition-opacity duration-500 ${
                       imageLoaded ? 'opacity-100' : 'opacity-0'
                     }`}

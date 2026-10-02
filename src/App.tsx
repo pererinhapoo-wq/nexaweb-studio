@@ -29,6 +29,7 @@ import {
   ContactModal,
   type ServiceLevelType,
   type ModelIntentType,
+  type BriefingStage,
 } from './components/ContactModal';
 import { ShowcaseBanner } from './components/ShowcaseBanner';
 import { PlansSection } from './components/PlansSection';
@@ -55,6 +56,7 @@ export default function App() {
   // Auxiliary modals
   const [advisorModalOpen, setAdvisorModalOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
+  const [modalInitialStage, setModalInitialStage] = useState<BriefingStage>('presentation');
 
   // Opens briefing modal with specified plan or briefing category
   const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
@@ -80,16 +82,18 @@ export default function App() {
       setSelectedBriefingType(null);
     }
 
+    setModalInitialStage('presentation');
     setContactModalOpen(true);
   };
 
   // Called when user selects a plan from PlansSection or PlanDetailModal
-  const handleSelectPlan = (planId: PlanId) => {
+  const handleSelectPlan = (planId: PlanId, startAtBriefing = false) => {
     setSelectedProjectForBriefing(null);
     setSelectedServiceLevel(planId);
     setSelectedBriefingType(null);
     setSelectedInitialIntent(planId === 'Personalizado' ? 'custom_idea' : 'exact');
     setSelectedInitialDescription('');
+    setModalInitialStage(startAtBriefing ? 'briefing' : 'presentation');
     setContactModalOpen(true);
   };
 
@@ -100,6 +104,7 @@ export default function App() {
     setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
     setSelectedInitialIntent(null); // will trigger intent choice step ("Quero este formato / Usar como inspiração / Ideia própria")
     setSelectedInitialDescription('');
+    setModalInitialStage('presentation');
     setContactModalOpen(true);
   };
 
@@ -112,6 +117,7 @@ export default function App() {
     setSelectedInitialDescription(
       segmentName ? `Gostaria de um site para o segmento de ${segmentName}. ` : ''
     );
+    setModalInitialStage('briefing');
     setContactModalOpen(true);
   };
 
@@ -124,6 +130,7 @@ export default function App() {
     setSelectedInitialDescription(
       `Gostaria de usar o projeto "${project.name}" (${project.category}) como inspiração para o meu site.`
     );
+    setModalInitialStage('briefing');
     setContactModalOpen(true);
   };
 
@@ -732,6 +739,7 @@ export default function App() {
         selectedProject={selectedProjectForBriefing}
         initialIntent={selectedInitialIntent}
         initialDescription={selectedInitialDescription}
+        initialStage={modalInitialStage}
       />
 
       {/* Plan Advisor Wizard Modal */}

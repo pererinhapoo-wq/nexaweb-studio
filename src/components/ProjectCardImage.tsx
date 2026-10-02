@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Globe, Sparkles } from 'lucide-react';
 import type { ProjectItem } from '../data/projects';
 
+// Global cache across mounts for instant load and error memory
+const imageStatusCache = new Map<string, 'loaded' | 'error'>();
+
 interface ProjectCardImageProps {
   project: ProjectItem;
   className?: string;
@@ -15,18 +18,40 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState<boolean>(priority);
-  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  const [hasError, setHasError] = useState<boolean>(false);
 
-  const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
+  const isRealUrl = Boolean(
+    project.url &&
+    project.url !== '#' &&
+    (project.url.startsWith('http://') || project.url.startsWith('https://'))
+  );
 
-  // Optimized screenshot thumbnail endpoint (640x400 for speed, retina sharpness, small payload)
-  const screenshotUrl = useMemo(() => {
+  // Automated capture URL from project.url (WordPress mshots - free, fast, no API key needed)
+  const primaryCaptureUrl = useMemo(() => {
     if (!isRealUrl) return '';
-    return `https://s0.wp.com/mshots/v1/${encodeURIComponent(project.url)}?w=640&h=400`;
+    return `https://s0.wp.com/mshots/v1/${encodeURIComponent(project.url)}?w=800&h=500`;
   }, [project.url, isRealUrl]);
 
-  // Clean domain display safely
+  // Secondary automated capture URL fallback if WordPress mshots is unavailable
+  const secondaryCaptureUrl = useMemo(() => {
+    if (!isRealUrl) return '';
+    return `https://api.microlink.io?url=${encodeURIComponent(project.url)}&screenshot=true&meta=false&embed=screenshot.url`;
+  }, [project.url, isRealUrl]);
+
+  // Determine initial attempt source
+  const [attemptSource, setAttemptSource] = useState<'primary' | 'secondary' | 'fallback' | 'placeholder'>(() => {
+    if (!isRealUrl) return 'placeholder';
+    const cached = imageStatusCache.get(project.url);
+    if (cached === 'error') {
+      return project.fallbackImage ? 'fallback' : 'placeholder';
+    }
+    return 'primary';
+  });
+
+  const [imageLoaded, setImageLoaded] = useState<boolean>(() => {
+    return isRealUrl && imageStatusCache.get(project.url) === 'loaded';
+  });
+
+  // Extract clean hostname safely for the simulated browser bar
   const displayHostname = useMemo(() => {
     if (!isRealUrl) return 'nexaweb.com.br';
     try {
@@ -36,7 +61,7 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
     }
   }, [project.url, isRealUrl]);
 
-  // IntersectionObserver for lazy loading images only when near viewport (250px margin)
+  // IntersectionObserver for lazy loading images only when near viewport
   useEffect(() => {
     if (priority || isInView) return;
 
@@ -50,7 +75,7 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
         });
       },
       {
-        rootMargin: '250px 0px',
+        rootMargin: '200px 0px',
         threshold: 0.01,
       }
     );
@@ -63,6 +88,39 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
       observer.disconnect();
     };
   }, [priority, isInView]);
+
+  // Current image source to load
+  const activeImageSrc = useMemo(() => {
+    if (attemptSource === 'primary') return primaryCaptureUrl;
+    if (attemptSource === 'secondary') return secondaryCaptureUrl;
+    if (attemptSource === 'fallback' && project.fallbackImage) return project.fallbackImage;
+    return '';
+  }, [attemptSource, primaryCaptureUrl, secondaryCaptureUrl, project.fallbackImage]);
+
+  const handleImageError = () => {
+    if (attemptSource === 'primary') {
+      // Try secondary screenshot capture
+      setAttemptSource('secondary');
+    } else if (attemptSource === 'secondary') {
+      // Try manual fallback if exists, otherwise placeholder
+      if (project.fallbackImage && project.fallbackImage.trim() !== '') {
+        setAttemptSource('fallback');
+      } else {
+        imageStatusCache.set(project.url, 'error');
+        setAttemptSource('placeholder');
+      }
+    } else if (attemptSource === 'fallback') {
+      imageStatusCache.set(project.url, 'error');
+      setAttemptSource('placeholder');
+    }
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    if (isRealUrl) {
+      imageStatusCache.set(project.url, 'loaded');
+    }
+  };
 
   const tierAccent =
     project.tier === 'Premium'
@@ -86,9 +144,9 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden bg-[#0d0f14] ${className}`}
+      className={`relative overflow-hidden bg-[#0a0c10] select-none ${className}`}
     >
-      {/* Subtle simulated browser chrome */}
+      {/* Simulated browser chrome header */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 py-1.5 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-neutral-700/80 group-hover:bg-red-500/80 transition-colors" />
@@ -106,33 +164,34 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
         </span>
       </div>
 
-      {/* Main image presentation */}
-      {isRealUrl && !hasError && isInView ? (
+      {/* Main image presentation or elegant placeholder */}
+      {attemptSource !== 'placeholder' && activeImageSrc && isInView ? (
         <>
           <img
-            src={screenshotUrl}
-            alt={`Captura do site ${project.name} - NexaWeb`}
+            key={activeImageSrc}
+            src={activeImageSrc}
+            alt={`Captura automática do site ${project.name} - NexaWeb`}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setHasError(true)}
-            className={`w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03] ${
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            className={`w-full h-full object-cover object-top transition-all duration-500 ease-out group-hover:scale-[1.03] ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
 
           {/* Skeleton while image is loading */}
           {!imageLoaded && (
-            <div className="absolute inset-0 pt-7 flex flex-col items-center justify-center bg-neutral-900/90">
+            <div className="absolute inset-0 pt-7 flex flex-col items-center justify-center bg-neutral-900/95 animate-pulse">
               <div className="w-6 h-6 rounded-full border-2 border-neutral-700 border-t-amber-400 animate-spin mb-2" />
               <span className="text-[11px] font-mono text-neutral-500">
-                Captura ao vivo...
+                Gerando captura ao vivo...
               </span>
             </div>
           )}
         </>
       ) : (
-        /* Fallback presentation: clean aesthetic preview with title, category, and mock structure */
+        /* Fallback placeholder: Domain-tailored clean layout, never shows broken image */
         <div
           className={`w-full h-full pt-8 p-4 flex flex-col justify-between bg-gradient-to-br ${tierAccent.bg}`}
         >

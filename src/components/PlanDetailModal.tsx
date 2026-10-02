@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Check,
@@ -11,27 +12,31 @@ import {
   Laptop,
   CheckCircle2,
 } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export type PlanId = 'Essencial' | 'Personalizado' | 'Profissional' | 'Premium';
 
 export interface PlanDetailData {
   id: PlanId;
   name: string;
+  badge: string;
   tagline: string;
   description: string;
+  price: string;
   targetAudience: string;
   turnaroundTime: string;
-  accentColor: 'blue' | 'purple' | 'emerald' | 'amber';
+  accentColor: 'blue' | 'purple' | 'orange' | 'amber';
   inclusions: string[];
   differentials: string[];
-  badge: string;
 }
 
 export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
   Essencial: {
     id: 'Essencial',
     name: 'Essencial',
-    badge: 'Nível 01',
+    badge: 'Nível 01 · Presença Essencial',
+    price: 'R$ 1.000',
     tagline: 'O essencial para colocar seu negócio na internet com profissionalismo',
     description:
       'Ideal para quem precisa de um site moderno, rápido e direto ao ponto. Uma solução sólida com excelente custo-benefício e entrega ágil.',
@@ -50,8 +55,8 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
       'Processo de aprovação antes da publicação definitiva',
     ],
     differentials: [
-      'Entrega rápida e objetiva',
-      'Investimento acessível',
+      'Entrega rápida e objetiva (3–5 dias)',
+      'Investimento acessível e transparente',
       'Design limpo e sem poluição visual',
       'Fácil navegação para seus clientes',
     ],
@@ -60,7 +65,8 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
   Personalizado: {
     id: 'Personalizado',
     name: 'Personalizado',
-    badge: 'Sob Medida',
+    badge: 'Sob Medida · Exclusivo',
+    price: 'A partir de R$ 2.800',
     tagline: 'Um projeto sob medida criado de acordo com as necessidades do seu negócio',
     description:
       'Liberdade total de configuração. Você escolhe o estilo visual, as seções necessárias, as funcionalidades desejadas e como imagina o site.',
@@ -89,14 +95,15 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
   Profissional: {
     id: 'Profissional',
     name: 'Profissional',
-    badge: 'Nível 02',
+    badge: 'Nível 02 · Autoridade e Conversão',
+    price: 'R$ 1.700',
     tagline: 'Mais recursos e autoridade para fortalecer sua marca no mercado',
     description:
       'Uma solução robusta com maior aprofundamento de conteúdo, múltiplos blocos de autoridade e estratégia voltada para captação de clientes.',
     targetAudience:
       'Empresas estabelecidas, escritórios, consultorias, clínicas e comércios que precisam de uma presença digital com autoridade.',
     turnaroundTime: '5 a 8 dias úteis',
-    accentColor: 'emerald',
+    accentColor: 'orange',
     inclusions: [
       'Estrutura aprofundada com páginas ou seções detalhadas para cada serviço',
       'Destaques interativos, cards explicativos e tabela comparativa',
@@ -119,6 +126,7 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
     id: 'Premium',
     name: 'Premium',
     badge: 'Nível 03 · Alto Padrão',
+    price: 'A partir de R$ 4.500',
     tagline: 'A experiência máxima de sofisticação visual, tecnologia e exclusividade',
     description:
       'Desenvolvido para marcas que desejam impressionar e se destacar no mercado de alto padrão com um site impecável, imersivo e de alto valor percebido.',
@@ -156,9 +164,18 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
   onClose,
   onSelectPlan,
 }) => {
-  if (!planId) return null;
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useScrollLock(!!planId);
+  useModalA11y({
+    isOpen: !!planId,
+    onClose,
+    containerRef: modalRef,
+  });
+
+  if (!planId || !PLANS_DATA[planId] || typeof document === 'undefined') return null;
+
   const plan = PLANS_DATA[planId];
-  if (!plan) return null;
 
   const colorStyles = {
     blue: {
@@ -175,12 +192,12 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
       border: 'border-purple-500/30',
       check: 'text-purple-400',
     },
-    emerald: {
-      badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-      icon: <Award className="w-5 h-5 text-emerald-400" />,
-      btn: 'bg-gradient-to-r from-emerald-400 to-teal-300 text-neutral-950 hover:from-emerald-300 hover:to-teal-200 shadow-emerald-500/20',
-      border: 'border-emerald-500/30',
-      check: 'text-emerald-400',
+    orange: {
+      badge: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
+      icon: <Award className="w-5 h-5 text-orange-400" />,
+      btn: 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 text-neutral-950 hover:brightness-105 shadow-orange-500/20',
+      border: 'border-orange-500/30',
+      check: 'text-orange-400',
     },
     amber: {
       badge: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
@@ -191,24 +208,32 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
     },
   }[plan.accentColor];
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[65] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
     >
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-7 py-4 border-b border-neutral-800 bg-neutral-950/80">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className={`relative z-10 w-full max-w-2xl max-h-[92vh] flex flex-col bg-neutral-900 border rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${colorStyles.border}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Fixed Top */}
+        <div className="shrink-0 flex items-center justify-between px-5 sm:px-7 py-3.5 border-b border-neutral-800 bg-neutral-950/95 z-20">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center">
               {colorStyles.icon}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                <h3 className="text-lg sm:text-xl font-bold font-display text-white">
                   Plano {plan.name}
                 </h3>
                 <span
@@ -225,94 +250,117 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
             type="button"
             onClick={onClose}
             className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-            aria-label="Fechar"
+            aria-label="Fechar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6">
-          {/* Summary Box */}
-          <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800/90 space-y-2">
-            <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-              {plan.description}
-            </p>
-            <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-neutral-400 border-t border-neutral-800/80">
-              <span className="flex items-center gap-1.5">
-                <Laptop className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Público: {plan.targetAudience}</span>
+        {/* Content Body - Central Scrollable */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-7 space-y-6"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {/* Price & Turnaround Box */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800">
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
+                Investimento
               </span>
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Prazo: {plan.turnaroundTime}</span>
-              </span>
+              <div className="text-2xl font-extrabold font-display text-white">
+                {plan.price}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-neutral-300">
+              <Clock className="w-4 h-4 text-neutral-400" />
+              <span>Prazo: {plan.turnaroundTime}</span>
             </div>
           </div>
 
-          {/* O que está incluído */}
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-wider text-white mb-3 flex items-center gap-2">
-              <CheckCircle2 className={`w-4 h-4 ${colorStyles.check}`} />
-              <span>O que está incluído no Plano {plan.name}</span>
+          {/* Description */}
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+              Visão Geral
             </h4>
-            <div className="space-y-2.5">
+            <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+              {plan.description}
+            </p>
+          </div>
+
+          {/* Target Audience */}
+          <div className="p-3.5 rounded-xl bg-neutral-950/50 border border-neutral-800/80 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+              <Laptop className="w-3.5 h-3.5" />
+              <span>Ideal Para</span>
+            </span>
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              {plan.targetAudience}
+            </p>
+          </div>
+
+          {/* Inclusions */}
+          <div className="space-y-2.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+              O que está incluído
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {plan.inclusions.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/70 text-xs sm:text-sm text-neutral-200"
+                  className="flex items-start gap-2 p-2.5 rounded-xl bg-neutral-950/60 border border-neutral-800/60"
                 >
-                  <div className="w-5 h-5 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className={`w-3.5 h-3.5 ${colorStyles.check}`} />
-                  </div>
+                  <Check className={`w-3.5 h-3.5 ${colorStyles.check} shrink-0 mt-0.5`} />
+                  <span className="text-xs text-neutral-300 leading-relaxed">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Differentials */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+              Diferenciais deste plano
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {plan.differentials.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 text-xs text-neutral-300"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                   <span>{item}</span>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Diferenciais */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">
-              Principais diferenciais deste formato
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {plan.differentials.map((diff, idx) => (
-                <div
-                  key={idx}
-                  className="p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800/70 text-xs text-neutral-300 flex items-center gap-2"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  <span>{diff}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* Footer with Choice Action */}
-        <div className="p-4 sm:p-5 border-t border-neutral-800 bg-neutral-950/90 flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Footer - Fixed Bottom */}
+        <div className="shrink-0 p-4 sm:p-5 border-t border-neutral-800 bg-neutral-950/95 flex flex-col sm:flex-row items-center justify-between gap-3 z-20">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
           >
-            Voltar e comparar outros
+            Voltar
           </button>
 
           <button
             type="button"
             onClick={() => {
-              onSelectPlan(plan.id);
               onClose();
+              onSelectPlan(plan.id);
             }}
-            className={`w-full sm:w-auto min-h-[44px] px-7 py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${colorStyles.btn}`}
+            className={`w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${colorStyles.btn}`}
           >
-            <span>Escolher Plano {plan.name} e preencher briefing</span>
+            <span>Escolher este plano ({plan.name})</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
