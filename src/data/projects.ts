@@ -445,7 +445,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'NOVA ARQ',
     category: 'Arquitetura',
     tier: 'Profissional',
-    url: '',
+    url: 'https://nexaweb-nova-arq-1.vercel.app/',
     description:
       'Projeto profissional desenvolvido para uma apresentação mais completa e sofisticada de serviços de arquitetura.',
     fallbackImage: '',
@@ -476,7 +476,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'LUMIÈRE',
     category: 'Clínica / Saúde',
     tier: 'Profissional',
-    url: '',
+    url: 'https://nexaweb-lumiere.vercel.app/',
     description:
       'Projeto profissional para uma apresentação elegante de serviços, informações e atendimento.',
     fallbackImage: '',
@@ -507,7 +507,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     name: 'VERTEX DIGITAL',
     category: 'Tecnologia',
     tier: 'Profissional',
-    url: '',
+    url: 'https://nexaweb-vertex-digital.vercel.app/',
     description:
       'Projeto profissional para empresas de tecnologia que precisam apresentar soluções e serviços de forma clara.',
     fallbackImage: '',

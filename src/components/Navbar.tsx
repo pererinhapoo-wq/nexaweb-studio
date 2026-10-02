@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowUpRight, Sparkles, Shield, Award, Sliders, HelpCircle, Layers, Lock } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Menu, X, ArrowUpRight, Sparkles, HelpCircle } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 
 interface NavbarProps {
@@ -21,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Strictly lock background page scroll when mobile drawer is open
   useScrollLock(mobileMenuOpen);
 
-  // Keyboard Escape and browser/Android back button integration for mobile menu
+  // Keyboard Escape listener for mobile menu
   useEffect(() => {
     if (!mobileMenuOpen) return;
 
@@ -31,21 +32,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       }
     };
 
-    // Push temporary state so Android back button closes menu smoothly
-    window.history.pushState({ nexaDrawer: true }, '');
-    const handlePopState = () => {
-      setMobileMenuOpen(false);
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('popstate', handlePopState);
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('popstate', handlePopState);
-      if (window.history.state?.nexaDrawer) {
-        window.history.back();
-      }
     };
   }, [mobileMenuOpen]);
 
@@ -73,10 +62,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
+    if (targetId === 'inicio') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+      return;
+    }
     // Let scroll unlock settle, then smoothly navigate to the target section
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const el = document.getElementById(targetId);
+        const el =
+          document.getElementById(targetId) ||
+          (targetId === 'como-funciona' ? document.getElementById('diferenciais') : null);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth' });
         }
@@ -235,151 +234,190 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Left Drawer & Backdrop (Completely locks background page scroll) */}
-      {mobileMenuOpen && (
-        <>
-          {/* Backdrop that prevents touchmove on background */}
+      {/* Mobile Drawer & Backdrop (Opens from the RIGHT, slides RIGHT-to-LEFT) */}
+      {typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 lg:hidden animate-fadeIn"
-            onClick={() => setMobileMenuOpen(false)}
-            onTouchMove={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            aria-hidden="true"
-          />
-
-          {/* Left Drawer */}
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu lateral de navegação"
-            className="fixed inset-y-0 left-0 w-[86vw] max-w-[320px] bg-neutral-950 border-r border-neutral-800 z-50 lg:hidden flex flex-col justify-between p-5 overflow-y-auto overscroll-contain shadow-2xl animate-fadeIn"
-            onTouchMove={(e) => {
-              e.stopPropagation();
-            }}
+            className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
+              mobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
+            }`}
+            aria-hidden={!mobileMenuOpen}
           >
-            {/* Drawer Header */}
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-neutral-900 p-[1px]">
-                    <div className="w-full h-full bg-neutral-950 rounded-[11px] flex items-center justify-center font-display font-extrabold text-amber-400 text-sm">
-                      N
+            {/* Backdrop that dims the rest of the page and prevents touchmove on background */}
+            <div
+              className={`fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${
+                mobileMenuOpen ? 'opacity-100' : 'opacity-0'
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+              onTouchMove={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              aria-hidden="true"
+            />
+
+            {/* Right Drawer Panel (opens from right, slides right-to-left, closes returning to right) */}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu lateral de navegação"
+              className={`fixed inset-y-0 right-0 w-[86vw] max-w-[320px] bg-neutral-950 border-l border-neutral-800 flex flex-col justify-between p-5 overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-300 ease-in-out transform ${
+                mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+              }`}
+              onTouchMove={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              {/* Drawer Header */}
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-neutral-900 p-[1px]">
+                      <div className="w-full h-full bg-neutral-950 rounded-[11px] flex items-center justify-center font-display font-extrabold text-amber-400 text-sm">
+                        N
+                      </div>
                     </div>
+                    <span className="font-display font-bold text-lg text-white">NexaWeb</span>
                   </div>
-                  <span className="font-display font-bold text-lg text-white">NexaWeb</span>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors"
+                    aria-label="Fechar menu"
+                  >
+                    <X className="w-5 h-5 text-amber-400" />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors"
-                  aria-label="Fechar menu"
-                >
-                  <X className="w-5 h-5 text-amber-400" />
-                </button>
+                {/* Navigation links */}
+                <nav className="flex flex-col gap-2 pt-4 text-sm font-medium text-neutral-300">
+                  <a
+                    href="#inicio"
+                    onClick={(e) => handleNavClick(e, 'inicio')}
+                    className="min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 hover:text-white transition-colors text-xs font-semibold"
+                  >
+                    <span>🏠 Início</span>
+                  </a>
+
+                  <a
+                    href="#planos"
+                    onClick={(e) => handleNavClick(e, 'planos')}
+                    className="text-white flex items-center justify-between p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>Ver os 4 Planos</span>
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-bold">Oficial</span>
+                  </a>
+
+                  <a
+                    href="#como-funciona"
+                    onClick={(e) => handleNavClick(e, 'como-funciona')}
+                    className="min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
+                  >
+                    <span>📖 Como funciona</span>
+                  </a>
+
+                  <a
+                    href="#showcase"
+                    onClick={(e) => handleNavClick(e, 'showcase')}
+                    className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
+                  >
+                    Showcase Automático
+                  </a>
+
+                  <a
+                    href="#segmentos"
+                    onClick={(e) => handleNavClick(e, 'segmentos')}
+                    className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
+                  >
+                    Tipos de Sites & Segmentos
+                  </a>
+
+                  <a
+                    href="#modelos"
+                    onClick={(e) => handleNavClick(e, 'modelos')}
+                    className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
+                  >
+                    <span>Amostras no Ar</span>
+                    <span className="text-xs text-amber-400 font-bold font-mono">22 sites</span>
+                  </a>
+
+                  <a
+                    href="#personalizado"
+                    onClick={(e) => handleNavClick(e, 'personalizado')}
+                    className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
+                  >
+                    <span>Plano Personalizado</span>
+                    <span className="text-xs text-purple-400 font-bold">Sob Medida</span>
+                  </a>
+
+                  <a
+                    href="#diferenciais"
+                    onClick={(e) => handleNavClick(e, 'diferenciais')}
+                    className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors text-xs"
+                  >
+                    Diferenciais NexaWeb
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenContact(null);
+                    }}
+                    className="w-full min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-amber-300 transition-colors text-xs font-semibold text-left"
+                  >
+                    <span>📩 Contato</span>
+                  </button>
+
+                  <a
+                    href="https://www.instagram.com/nexaw1/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-pink-400/90 hover:text-pink-300 transition-colors text-xs font-semibold"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>📸 Instagram</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-neutral-500" />
+                  </a>
+                </nav>
               </div>
 
-              {/* Navigation links */}
-              <nav className="flex flex-col gap-2 pt-4 text-sm font-medium text-neutral-300">
-                <a
-                  href="#planos"
-                  onClick={(e) => handleNavClick(e, 'planos')}
-                  className="text-white flex items-center justify-between p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 font-semibold"
-                >
-                  <span className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Ver os 4 Planos</span>
-                  </span>
-                  <span className="text-[10px] text-amber-400 font-bold">Oficial</span>
-                </a>
+              {/* Bottom Actions */}
+              <div className="pt-4 space-y-2 border-t border-neutral-800/80">
+                {onOpenAdvisor && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAdvisor();
+                    }}
+                    className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-neutral-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <HelpCircle className="w-4 h-4 text-amber-400" />
+                    <span>Me ajude a escolher o plano</span>
+                  </button>
+                )}
 
-                <a
-                  href="#showcase"
-                  onClick={(e) => handleNavClick(e, 'showcase')}
-                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
-                >
-                  Showcase Automático
-                </a>
-
-                <a
-                  href="#segmentos"
-                  onClick={(e) => handleNavClick(e, 'segmentos')}
-                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
-                >
-                  Tipos de Sites & Segmentos
-                </a>
-
-                <a
-                  href="#modelos"
-                  onClick={(e) => handleNavClick(e, 'modelos')}
-                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
-                >
-                  <span>Amostras no Ar</span>
-                  <span className="text-xs text-amber-400 font-bold font-mono">22 sites</span>
-                </a>
-
-                <a
-                  href="#personalizado"
-                  onClick={(e) => handleNavClick(e, 'personalizado')}
-                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-200 transition-colors text-xs font-semibold"
-                >
-                  <span>Plano Personalizado</span>
-                  <span className="text-xs text-purple-400 font-bold">Sob Medida</span>
-                </a>
-
-                <a
-                  href="#diferenciais"
-                  onClick={(e) => handleNavClick(e, 'diferenciais')}
-                  className="min-h-[44px] flex items-center px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors text-xs"
-                >
-                  Diferenciais NexaWeb
-                </a>
-
-                <a
-                  href="/admin"
-                  onClick={handleAdminClick}
-                  className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-400 hover:text-amber-400 transition-colors text-xs font-semibold"
-                >
-                  <span className="flex items-center gap-2">
-                    <Lock className="w-3.5 h-3.5 text-neutral-500" />
-                    <span>Admin</span>
-                  </span>
-                  <span className="text-[10px] text-neutral-500 font-mono">/admin</span>
-                </a>
-              </nav>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="pt-4 space-y-2 border-t border-neutral-800/80">
-              {onOpenAdvisor && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAdvisor();
-                  }}
-                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-neutral-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                  onClick={handleStart}
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-400/15"
                 >
-                  <HelpCircle className="w-4 h-4 text-amber-400" />
-                  <span>Me ajude a escolher o plano</span>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Criar meu site</span>
+                  <ArrowUpRight className="w-4 h-4" />
                 </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleStart}
-                className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-400/15"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Criar meu site</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </button>
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </div>,
+          document.body
+        )}
     </header>
   );
 };

@@ -100,7 +100,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             title="Ver detalhes do projeto"
           >
             <Eye className="w-3 h-3 text-amber-400" />
-            <span>Visão Geral</span>
+            <span>Detalhes</span>
           </button>
         </div>
 

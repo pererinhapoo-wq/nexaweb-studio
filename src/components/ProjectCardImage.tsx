@@ -60,28 +60,35 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
     return `https://api.microlink.io?url=${encodeURIComponent(project.url)}&screenshot=true&meta=false&embed=screenshot.url`;
   }, [project.url, isRealUrl]);
 
-  // Determine initial attempt source based on:
-  // 1. Automatic capture (if real URL)
-  // 2. Manual image
-  // 3. Clean placeholder
-  const [attemptSource, setAttemptSource] = useState<'primary' | 'secondary' | 'manual' | 'placeholder'>(() => {
+  // Ordem de prioridade estrita conforme especificação:
+  // 1. Imagem manual cadastrada pelo Admin (se existir)
+  // 2. Captura automática do site (WordPress mshots -> Microlink fallback)
+  // 3. Fallback visual elegante existente ("Modelo Conceitual")
+  const [attemptSource, setAttemptSource] = useState<'manual' | 'primary' | 'secondary' | 'placeholder'>(() => {
+    if (effectiveManualImage && effectiveManualImage.trim() !== '') {
+      return 'manual';
+    }
     if (isRealUrl) {
       const cached = imageStatusCache.get(project.url);
       if (cached === 'error') {
-        return effectiveManualImage ? 'manual' : 'placeholder';
+        return 'placeholder';
       }
       return 'primary';
     }
-    if (effectiveManualImage) return 'manual';
     return 'placeholder';
   });
 
-  // Re-evaluate attempt source if manualOverride changes
+  // Reavalia a fonte quando houver alteração de imagem manual ou URL do projeto
   useEffect(() => {
-    if (effectiveManualImage && (!isRealUrl || attemptSource === 'placeholder')) {
+    if (effectiveManualImage && effectiveManualImage.trim() !== '') {
       setAttemptSource('manual');
+    } else if (isRealUrl) {
+      const cached = imageStatusCache.get(project.url);
+      setAttemptSource(cached === 'error' ? 'placeholder' : 'primary');
+    } else {
+      setAttemptSource('placeholder');
     }
-  }, [effectiveManualImage, isRealUrl]);
+  }, [effectiveManualImage, isRealUrl, project.url]);
 
   const [imageLoaded, setImageLoaded] = useState<boolean>(() => {
     return isRealUrl && imageStatusCache.get(project.url) === 'loaded';
@@ -127,25 +134,25 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
 
   // Current image source to load
   const activeImageSrc = useMemo(() => {
+    if (attemptSource === 'manual' && effectiveManualImage) return effectiveManualImage;
     if (attemptSource === 'primary') return primaryCaptureUrl;
     if (attemptSource === 'secondary') return secondaryCaptureUrl;
-    if (attemptSource === 'manual' && effectiveManualImage) return effectiveManualImage;
     return '';
   }, [attemptSource, primaryCaptureUrl, secondaryCaptureUrl, effectiveManualImage]);
 
   const handleImageError = () => {
-    if (attemptSource === 'primary') {
-      // Try secondary screenshot capture
-      setAttemptSource('secondary');
-    } else if (attemptSource === 'secondary') {
-      // Try manual image if exists, otherwise clean placeholder
-      if (effectiveManualImage && effectiveManualImage.trim() !== '') {
-        setAttemptSource('manual');
+    if (attemptSource === 'manual') {
+      // 1. Se a imagem manual falhar, recorre à captura automática ou fallback
+      if (isRealUrl) {
+        setAttemptSource('primary');
       } else {
-        if (project.url) imageStatusCache.set(project.url, 'error');
         setAttemptSource('placeholder');
       }
-    } else if (attemptSource === 'manual') {
+    } else if (attemptSource === 'primary') {
+      // 2. Se a captura primária falhar, tenta o fallback de captura secundária
+      setAttemptSource('secondary');
+    } else if (attemptSource === 'secondary') {
+      // 3. Se ambas as capturas falharem, exibe o fallback visual apropriado
       if (project.url) imageStatusCache.set(project.url, 'error');
       setAttemptSource('placeholder');
     }

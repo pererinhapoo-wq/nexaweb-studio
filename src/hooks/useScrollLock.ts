@@ -148,7 +148,15 @@ export function unlockScroll() {
         // Explicitly reset savedScrollY so future modal openings never inherit stale values
         savedScrollY = 0;
 
-        window.scrollTo(0, targetScrollY);
+        try {
+          window.scrollTo({
+            left: 0,
+            top: targetScrollY,
+            behavior: 'instant' as ScrollBehavior,
+          });
+        } catch {
+          window.scrollTo(0, targetScrollY);
+        }
         document.documentElement.scrollTop = targetScrollY;
         document.body.scrollTop = targetScrollY;
 
