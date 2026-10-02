@@ -63,10 +63,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
+
+    const cleanHashUrl = () => {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    };
+
     if (targetId === 'inicio') {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           window.scrollTo({ top: 0, behavior: 'smooth' });
+          cleanHashUrl();
         });
       });
       return;
@@ -80,6 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         if (el) {
           el.scrollIntoView({ behavior: 'smooth' });
         }
+        cleanHashUrl();
       });
     });
   };
@@ -117,10 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-3">
             <a
               href="#inicio"
-              onClick={(e) => {
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onClick={(e) => handleNavClick(e, 'inicio')}
               className="flex items-center gap-2.5 group"
             >
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-neutral-900 p-[1px] shadow-md shadow-amber-500/10 group-hover:shadow-amber-500/25 transition-all">
@@ -148,6 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="hidden lg:flex items-center gap-5 text-xs font-semibold text-neutral-300">
             <a
               href="#planos"
+              onClick={(e) => handleNavClick(e, 'planos')}
               className="text-white hover:text-amber-300 transition-colors flex items-center gap-1"
             >
               <span>Planos</span>
@@ -158,6 +165,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#showcase"
+              onClick={(e) => handleNavClick(e, 'showcase')}
               className="hover:text-neutral-100 transition-colors"
             >
               Showcase
@@ -165,6 +173,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#segmentos"
+              onClick={(e) => handleNavClick(e, 'segmentos')}
               className="hover:text-neutral-100 transition-colors"
             >
               Segmentos
@@ -172,6 +181,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#modelos"
+              onClick={(e) => handleNavClick(e, 'modelos')}
               className="hover:text-neutral-100 transition-colors flex items-center gap-1"
             >
               <span>Amostras</span>
@@ -180,6 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="#personalizado"
+              onClick={(e) => handleNavClick(e, 'personalizado')}
               className="hover:text-purple-300 transition-colors flex items-center gap-1"
             >
               <span>Personalizado</span>

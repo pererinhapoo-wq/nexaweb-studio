@@ -74,19 +74,91 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Intercept any click to /admin or #admin globally for seamless client-side transition
+  // Intercept any click to /admin, #admin or internal hash navigation globally
   React.useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
       const target = (e.target as HTMLElement)?.closest('a');
       if (!target) return;
       const href = target.getAttribute('href');
+      if (!href) return;
+
+      // 1. Rota /admin e #admin (intacta e prioritária)
       if (href === '/admin' || href === '/admin/' || href === '#admin') {
         e.preventDefault();
         navigateTo('/admin');
+        return;
+      }
+
+      // 2. Navegação por âncoras internas (#planos, #como-funciona, #projetos-essencial, etc.)
+      if (href.startsWith('#') && href.length > 1 && !href.startsWith('#admin')) {
+        const targetId = href.slice(1);
+        e.preventDefault();
+
+        const cleanHash = () => {
+          if (typeof window !== 'undefined' && window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        };
+
+        if (targetId === 'inicio') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          cleanHash();
+          return;
+        }
+
+        // Se o destino for uma seção de projetos filtrada, assegura que a categoria seja exibida
+        if (targetId === 'projetos-essencial') {
+          setActiveCategoryTab((prev) => (prev === 'essencial' || prev === 'todos' ? prev : 'todos'));
+        } else if (targetId === 'projetos-profissional') {
+          setActiveCategoryTab((prev) => (prev === 'profissional' || prev === 'todos' ? prev : 'todos'));
+        } else if (targetId === 'projetos-premium') {
+          setActiveCategoryTab((prev) => (prev === 'premium' || prev === 'todos' ? prev : 'todos'));
+        }
+
+        requestAnimationFrame(() => {
+          const el =
+            document.getElementById(targetId) ||
+            (targetId === 'como-funciona' ? document.getElementById('diferenciais') : null);
+
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+          cleanHash();
+        });
       }
     };
     document.addEventListener('click', handleGlobalClick);
     return () => document.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  // Limpa fragmento (#) da URL mantendo a rolagem para a seção correspondente
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (hash && hash !== '#admin' && hash !== '#/admin' && !hash.startsWith('#admin/')) {
+      const targetId = hash.replace(/^#/, '');
+
+      if (targetId === 'projetos-essencial') {
+        setActiveCategoryTab('todos');
+      } else if (targetId === 'projetos-profissional') {
+        setActiveCategoryTab('todos');
+      } else if (targetId === 'projetos-premium') {
+        setActiveCategoryTab('todos');
+      }
+
+      requestAnimationFrame(() => {
+        const el =
+          document.getElementById(targetId) ||
+          (targetId === 'como-funciona' ? document.getElementById('diferenciais') : null);
+
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+
+      // Remove o hash da barra de endereços imediatamente sem recarregar a página
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }, []);
 
   // Commercial modal & flow states
@@ -335,6 +407,13 @@ export default function App() {
 
               <a
                 href="#planos"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('planos')?.scrollIntoView({ behavior: 'smooth' });
+                  if (typeof window !== 'undefined' && window.location.hash) {
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                  }
+                }}
                 className="min-h-[44px] px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-700/80 text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5"
               >
                 <span>Conhecer os 4 Planos</span>

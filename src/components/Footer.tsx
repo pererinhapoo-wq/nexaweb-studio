@@ -116,6 +116,13 @@ export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) 
             <div className="pt-2">
               <a
                 href="#personalizado"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('personalizado')?.scrollIntoView({ behavior: 'smooth' });
+                  if (typeof window !== 'undefined' && window.location.hash) {
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                  }
+                }}
                 className="text-xs text-purple-400 hover:text-purple-300 font-semibold inline-flex items-center gap-1.5 py-1.5 min-h-[40px]"
               >
                 <Sliders className="w-3.5 h-3.5" />
