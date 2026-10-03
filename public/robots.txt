@@ -1,0 +1,12 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Bloquear rotas administrativas e endpoints privados
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin.html
+Disallow: /api/
+
+# Sitemap oficial
+Sitemap: https://nexaweeb.vercel.app/sitemap.xml
