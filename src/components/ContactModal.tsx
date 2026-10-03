@@ -899,7 +899,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <span>Plano {activePlan}</span>
                   </span>
 
-                  <span className="text-[11px] sm:text-xs font-extrabold text-neutral-200 shrink-0">
+                  <span className="text-[11px] sm:text-xs font-extrabold text-neutral-200 shrink-0 whitespace-nowrap">
                     {planData.price}
                   </span>
                 </div>
@@ -981,7 +981,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             MODAL BODY (Scrollable Central Content with overscroll-contain)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4.5 sm:px-6 sm:py-6 space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-5"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {submitted ? (
@@ -1067,7 +1067,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
             <div className="space-y-5 animate-fadeIn">
               {/* Plan Switcher Pills */}
-              <div className="p-1.5 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center gap-1.5 overflow-x-auto scrollbar-none overscroll-x-contain sm:justify-between">
+              {/* Plan Switcher Pills */}
+              <div className="p-1 sm:p-1.5 rounded-2xl bg-neutral-950 border border-neutral-800 grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-1 sm:gap-1.5">
                 {(['Essencial', 'Personalizado', 'Profissional', 'Premium'] as PlanId[]).map(
                   (planTab) => {
                     const isTabActive = activePlan === planTab;
@@ -1076,9 +1077,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         key={planTab}
                         type="button"
                         onClick={() => setActivePlan(planTab)}
-                        className={`shrink-0 sm:shrink sm:flex-1 min-h-[40px] py-2 px-3.5 sm:px-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                        className={`w-full sm:w-auto sm:flex-1 min-h-[38px] sm:min-h-[40px] py-2 px-2.5 sm:px-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
                           isTabActive
-                            ? `${theme.badge} shadow-sm border`
+                            ? `${theme.badge} shadow-sm border font-extrabold`
                             : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
                         }`}
                       >
@@ -1092,39 +1093,52 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               {/* Selected Model Reference Banner (if came from a real project) */}
               {selectedProject && (
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-amber-400">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-amber-400 shrink-0">
                       <Sparkles className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
                         Modelo de Referência
                       </span>
-                      <p className="text-xs font-bold text-white">
+                      <p className="text-xs font-bold text-white truncate">
                         {selectedProject.name} ({selectedProject.category})
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[11px] text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800">
+                  <span className="text-[11px] text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800 shrink-0">
                     Plano {selectedProject.tier}
                   </span>
                 </div>
               )}
 
               {/* Price & Delivery Time Card */}
-              <div className="p-4.5 sm:p-5 rounded-2xl bg-neutral-950/90 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
-                <div className="space-y-1">
+              <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950/90 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
+                <div className="space-y-1 min-w-0">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     Investimento Oficial
                   </span>
-                  <div className="text-2xl sm:text-3xl font-extrabold font-display text-white">
-                    {planData.price}
+                  <div className="font-extrabold font-display text-white leading-tight">
+                    {planData.price.includes('A partir de') ? (
+                      <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5">
+                        <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                          A partir de
+                        </span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-white whitespace-nowrap">
+                          {planData.price.replace('A partir de', '').trim()}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-extrabold text-white whitespace-nowrap">
+                        {planData.price}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-neutral-400 leading-relaxed">{planData.tagline}</p>
                 </div>
 
-                <div className="sm:text-right space-y-1 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-neutral-800/80">
+                <div className="sm:text-right space-y-1 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-neutral-800/80 shrink-0">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex sm:justify-end items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Prazo de Entrega</span>
