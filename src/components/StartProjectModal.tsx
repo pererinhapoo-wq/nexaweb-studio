@@ -40,7 +40,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       onTouchMove={(e) => {
@@ -52,20 +52,20 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="relative z-10 w-full max-w-lg max-h-[92vh] bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col outline-none"
+        className="relative z-10 w-full max-w-lg max-h-[92vh] max-h-[92dvh] bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100 flex flex-col outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950/80 z-20">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
+        <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-neutral-800 bg-neutral-950/80 z-20">
+          <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+            <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold font-display text-white">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm sm:text-lg font-bold font-display text-white truncate">
                 Como você deseja começar seu site?
               </h3>
-              <p className="text-[11px] text-neutral-400">
+              <p className="text-[11px] text-neutral-400 truncate">
                 Selecione o ponto de partida ideal para o seu projeto
               </p>
             </div>
@@ -74,7 +74,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            className="shrink-0 min-h-[38px] min-w-[38px] p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center justify-center"
             aria-label="Fechar"
           >
             <X className="w-5 h-5" />
@@ -82,7 +82,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
         </div>
 
         {/* 3 Starting Options */}
-        <div className="p-5 sm:p-6 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4.5 sm:p-6 space-y-3">
           {/* Option 1: Choose from existing samples */}
           <button
             type="button"

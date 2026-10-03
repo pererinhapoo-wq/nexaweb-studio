@@ -61,6 +61,7 @@ interface ContactModalProps {
   isOpen: boolean;
   onClose: () => void;
   onBack?: () => void;
+  onBackToProject?: () => void;
   serviceLevel?: ServiceLevelType | null;
   briefingType?: string | null;
   selectedProject?: ProjectItem | null;
@@ -223,6 +224,8 @@ export const SEGMENT_TAILORED_PRESETS: Record<
 export const ContactModal: React.FC<ContactModalProps> = ({
   isOpen,
   onClose,
+  onBack,
+  onBackToProject,
   serviceLevel,
   briefingType,
   selectedProject,
@@ -260,24 +263,16 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [modelIntent, setModelIntent] = useState<ModelIntentType>(initialIntent ?? null);
 
   // Hook 6: selectedEstilos (for Personalizado & Profissional/Premium)
-  const [selectedEstilos, setSelectedEstilos] = useState<string[]>(['Moderno']);
+  const [selectedEstilos, setSelectedEstilos] = useState<string[]>([]);
 
   // Hook 7: selectedSecoes
-  const [selectedSecoes, setSelectedSecoes] = useState<string[]>([
-    'Início / Destaque',
-    'Sobre Nós / História',
-    'Serviços / Especialidades',
-    'Contato / Localização',
-  ]);
+  const [selectedSecoes, setSelectedSecoes] = useState<string[]>([]);
 
   // Hook 8: selectedFuncionalidades
-  const [selectedFuncionalidades, setSelectedFuncionalidades] = useState<string[]>([
-    'Botão fixo de WhatsApp',
-    'Formulário comercial direto',
-  ]);
+  const [selectedFuncionalidades, setSelectedFuncionalidades] = useState<string[]>([]);
 
   // Hook 9: colorPreference
-  const [colorPreference, setColorPreference] = useState<'custom' | 'suggest'>('suggest');
+  const [colorPreference, setColorPreference] = useState<'custom' | 'suggest' | null>(null);
 
   // Hook 10: customColorsText
   const [customColorsText, setCustomColorsText] = useState('');
@@ -332,7 +327,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   }>({});
 
   // Hook 24: selectedPresetId (for Profissional & Premium segment-specific briefing)
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('academia');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
 
   // Hook 25: selectedAdvancedFeatures
   const [selectedAdvancedFeatures, setSelectedAdvancedFeatures] = useState<string[]>([]);
@@ -341,7 +336,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [selectedRealtimeFeatures, setSelectedRealtimeFeatures] = useState<string[]>([]);
 
   // Hook 27: selectedAccountRoles
-  const [selectedAccountRoles, setSelectedAccountRoles] = useState<UserRoleType[]>(['cliente']);
+  const [selectedAccountRoles, setSelectedAccountRoles] = useState<UserRoleType[]>([]);
 
   // Hook 28: currentPreset
   const currentPreset = useMemo(() => {
@@ -351,6 +346,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   // Hook 28b: customSegmentOptions tailored for Personalizado plan (Academia, Restaurante, Imobiliaria, Engenharia, etc.)
   const customSegmentOptions = useMemo(() => {
     const key = (businessSegment || selectedPresetId || '').toLowerCase().trim();
+    if (!key) {
+      return {
+        name: 'Geral / Sob Medida',
+        secoes: SECOES_PERSONALIZADO_DEFAULT,
+        recursos: FUNCIONALIDADES_PERSONALIZADO_DEFAULT,
+      };
+    }
     if (key.includes('fit') || key.includes('acad') || key.includes('cross')) {
       return SEGMENT_TAILORED_PRESETS['academia'];
     }
@@ -495,31 +497,27 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
     // Specific plan custom details
     if (activePlan === 'Personalizado') {
-      lines.push(`🎨 *Estilo:* ${selectedEstilos.join(', ')}`);
-      lines.push(`📑 *Seções:* ${selectedSecoes.join(', ')}`);
-      lines.push(`⚡ *Funcionalidades:* ${selectedFuncionalidades.join(', ')}`);
-      lines.push(
-        `🎨 *Cores:* ${
-          colorPreference === 'custom'
-            ? `Cores indicadas: ${customColorsText || 'A combinar'}`
-            : 'Quero que a NexaWeb sugira a melhor paleta'
-        }`
-      );
+      if (selectedEstilos.length > 0) lines.push(`🎨 *Estilo:* ${selectedEstilos.join(', ')}`);
+      if (selectedSecoes.length > 0) lines.push(`📑 *Seções:* ${selectedSecoes.join(', ')}`);
+      if (selectedFuncionalidades.length > 0) lines.push(`⚡ *Funcionalidades:* ${selectedFuncionalidades.join(', ')}`);
+      if (colorPreference === 'custom') {
+        lines.push(`🎨 *Cores:* ${customColorsText || 'Cores indicadas pelo cliente'}`);
+      } else if (colorPreference === 'suggest') {
+        lines.push('🎨 *Cores:* Quero que a NexaWeb sugira a melhor paleta');
+      }
       if (referenceUrl) lines.push(`🔗 *Referência Visual:* ${referenceUrl}`);
       if (customDescription) lines.push(`📝 *Visão do Cliente:* ${customDescription}`);
     } else if (activePlan === 'Essencial') {
       if (businessServices) lines.push(`📋 *Serviços Principais:* ${businessServices}`);
-      lines.push(
-        `🎨 *Cores:* ${
-          colorPreference === 'custom'
-            ? `Cores indicadas: ${customColorsText || 'A combinar'}`
-            : 'Sugerida pela NexaWeb'
-        }`
-      );
+      if (colorPreference === 'custom') {
+        lines.push(`🎨 *Cores:* ${customColorsText || 'Cores indicadas pelo cliente'}`);
+      } else if (colorPreference === 'suggest') {
+        lines.push('🎨 *Cores:* Sugerida pela NexaWeb');
+      }
     } else if (activePlan === 'Profissional' || activePlan === 'Premium') {
       lines.push(`👑 *Nível:* Plano ${activePlan}`);
-      lines.push(`🏢 *Segmento Alvo:* ${currentPreset.name}`);
-      lines.push(`📑 *Estrutura Selecionada:* ${selectedSecoes.join(', ')}`);
+      if (selectedPresetId) lines.push(`🏢 *Segmento Alvo:* ${currentPreset.name}`);
+      if (selectedSecoes.length > 0) lines.push(`📑 *Estrutura Selecionada:* ${selectedSecoes.join(', ')}`);
       if (selectedFuncionalidades.length > 0) {
         const featNames = selectedFuncionalidades.map((id) => FEATURE_CATALOG[id]?.name || id);
         lines.push(`✨ *Funcionalidades:* ${featNames.join(', ')}`);
@@ -608,6 +606,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setPhotoFiles([]);
     setUploadingPhotos(false);
     setUploadError('');
+    setColorPreference(null);
+    setCustomColorsText('');
 
     const targetPlan =
       serviceLevel || (selectedProject?.tier as ServiceLevelType) || 'Essencial';
@@ -616,29 +616,47 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
     if (initialDescription) {
       setCustomDescription(initialDescription);
+    } else {
+      setCustomDescription('');
     }
 
-    const matchedPreset = findSegmentPreset(
-      selectedProject?.category || selectedProject?.briefingType || briefingType || 'academia'
-    );
-    setSelectedPresetId(matchedPreset.id);
+    const isInspiration = initialIntent === 'inspiration';
 
-    if (selectedProject) {
+    if (isInspiration && selectedProject) {
+      // ENTRADA POR INSPIRAÇÃO: estado inicial baseado na demonstração escolhida
       setBusinessSegment(selectedProject.category);
+      const matchedPreset = findSegmentPreset(
+        selectedProject.category || selectedProject.briefingType || briefingType || 'academia'
+      );
+      setSelectedPresetId(matchedPreset.id);
+
       if (selectedProject.structure && selectedProject.structure.length > 0) {
         setSelectedSecoes(selectedProject.structure.slice(0, 8));
       } else {
         setSelectedSecoes(matchedPreset.defaultStructure.slice(0, 6));
       }
       setSelectedFuncionalidades(matchedPreset.standardFeatures.slice(0, 5));
+      setSelectedAdvancedFeatures(matchedPreset.advancedFeatures.slice(0, 2));
+      setSelectedRealtimeFeatures([]);
+      setSelectedAccountRoles(['cliente']);
+      setSelectedEstilos([]);
     } else {
-      setSelectedSecoes(matchedPreset.defaultStructure.slice(0, 6));
-      setSelectedFuncionalidades(matchedPreset.standardFeatures.slice(0, 5));
+      // ENTRADA DIRETA / FORMATO: estado inicial neutro sem perguntas marcadas automaticamente!
+      setBusinessSegment(selectedProject?.category || briefingType || '');
+      setSelectedPresetId(
+        selectedProject
+          ? findSegmentPreset(selectedProject.category || selectedProject.briefingType).id
+          : briefingType
+          ? findSegmentPreset(briefingType).id
+          : ''
+      );
+      setSelectedSecoes([]);
+      setSelectedFuncionalidades([]);
+      setSelectedAdvancedFeatures([]);
+      setSelectedRealtimeFeatures([]);
+      setSelectedAccountRoles([]);
+      setSelectedEstilos([]);
     }
-
-    setSelectedAdvancedFeatures(matchedPreset.advancedFeatures.slice(0, 2));
-    setSelectedRealtimeFeatures([]);
-    setSelectedAccountRoles(['cliente']);
   }, [isOpen, serviceLevel, selectedProject, initialIntent, initialDescription, briefingType, initialStage]);
 
   // Helper actions
@@ -647,10 +665,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     const preset = SEGMENT_PRESETS[presetKey];
     if (preset) {
       setBusinessSegment(preset.name.split('/')[0].trim());
-      setSelectedSecoes(preset.defaultStructure.slice(0, 6));
-      setSelectedFuncionalidades(preset.standardFeatures.slice(0, 5));
-      setSelectedAdvancedFeatures(preset.advancedFeatures.slice(0, 2));
-      setSelectedRealtimeFeatures([]);
     }
   };
 
@@ -659,16 +673,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     const tailored = SEGMENT_TAILORED_PRESETS[segmentKey];
     if (tailored) {
       setBusinessSegment(tailored.name.split('/')[0].trim());
-      setSelectedSecoes(tailored.secoes.slice(0, 5));
-      setSelectedFuncionalidades(tailored.recursos.slice(0, 4));
     } else {
       const preset = findSegmentPreset(segmentKey);
       setBusinessSegment(preset.name.split('/')[0].trim());
-      setSelectedSecoes(preset.defaultStructure.slice(0, 5));
-      setSelectedFuncionalidades([
-        ...preset.standardFeatures.slice(0, 3).map((f) => FEATURE_CATALOG[f]?.name || f),
-        ...preset.realtimeFeatures.slice(0, 1).map((f) => FEATURE_CATALOG[f]?.name || f),
-      ]);
     }
   };
 
@@ -678,9 +685,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setter: React.Dispatch<React.SetStateAction<string[]>>
   ) => {
     if (list.includes(item)) {
-      if (list.length > 1) {
-        setter(list.filter((i) => i !== item));
-      }
+      setter(list.filter((i) => i !== item));
     } else {
       setter([...list, item]);
     }
@@ -700,11 +705,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   const toggleRole = (role: UserRoleType) => {
     if (selectedAccountRoles.includes(role)) {
-      if (selectedAccountRoles.length > 1) {
-        setSelectedAccountRoles(selectedAccountRoles.filter((r) => r !== role));
-      }
+      setSelectedAccountRoles(selectedAccountRoles.filter((r) => r !== role));
     } else {
       setSelectedAccountRoles([...selectedAccountRoles, role]);
+    }
+  };
+
+  const handleStepBack = () => {
+    if (stage === 'review') {
+      setStage('contact');
+    } else if (stage === 'contact') {
+      setStage('briefing');
+    } else if (stage === 'briefing') {
+      setStage('presentation');
     }
   };
 
@@ -862,40 +875,36 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             MODAL HEADER (Pinned / Fixed Top)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="shrink-0 px-5 sm:px-6 py-3.5 border-b border-neutral-800 bg-neutral-950/95 z-20">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              {stage !== 'presentation' && (
+        <div className="shrink-0 px-3.5 sm:px-6 py-3 sm:py-3.5 border-b border-neutral-800 bg-neutral-950/95 z-20">
+          <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 pr-1">
+              {onBackToProject && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (stage === 'review') setStage('contact');
-                    else if (stage === 'contact') setStage('briefing');
-                    else if (stage === 'briefing') setStage('presentation');
-                  }}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-colors"
-                  aria-label="Voltar etapa"
-                  title="Voltar etapa anterior"
+                  onClick={onBackToProject}
+                  className="w-8 h-8 min-w-[32px] flex items-center justify-center rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white transition-colors shrink-0 border border-neutral-700/60"
+                  aria-label="Voltar para detalhes da demonstração"
+                  title="Voltar para detalhes da demonstração"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
 
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${theme.badge}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shrink-0 ${theme.badge}`}
                   >
                     {theme.icon}
                     <span>Plano {activePlan}</span>
                   </span>
 
-                  <span className="text-xs font-extrabold text-neutral-200">
+                  <span className="text-[11px] sm:text-xs font-extrabold text-neutral-200 shrink-0">
                     {planData.price}
                   </span>
                 </div>
 
-                <h3 className="text-sm sm:text-base font-bold font-display text-white mt-0.5">
+                <h3 className="text-xs sm:text-base font-bold font-display text-white mt-0.5 truncate">
                   {stage === 'presentation'
                     ? `Apresentação · Plano ${activePlan}`
                     : stage === 'briefing'
@@ -910,7 +919,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+              className="min-h-[36px] min-w-[36px] p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center justify-center shrink-0"
               aria-label="Fechar modal"
             >
               <X className="w-5 h-5" />
@@ -1237,7 +1246,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         1. Segmento de Atuação do Projeto:
                       </label>
                       <span className="text-[11px] font-mono text-purple-300 font-semibold">
-                        {customSegmentOptions.name}
+                        {selectedPresetId ? customSegmentOptions.name : 'Selecione uma opção'}
                       </span>
                     </div>
 
@@ -1254,10 +1263,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         { key: 'hotel', label: 'Hotel/Pousada' },
                         { key: 'empresa', label: 'Empresa B2B' },
                       ].map((item) => {
-                        const isSelected =
-                          selectedPresetId === item.key ||
-                          (businessSegment &&
-                            businessSegment.toLowerCase().includes(item.label.toLowerCase()));
+                        const isSelected = Boolean(
+                          selectedPresetId &&
+                          (selectedPresetId === item.key ||
+                            (businessSegment &&
+                              businessSegment.toLowerCase().includes(item.label.toLowerCase())))
+                        );
 
                         return (
                           <button
@@ -1588,13 +1599,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         1. Selecione o Segmento de Atuação:
                       </label>
                       <span className="text-[11px] font-mono text-neutral-400">
-                        {currentPreset.badge}
+                        {selectedPresetId ? currentPreset.badge : 'Selecione uma opção'}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
                       {Object.values(SEGMENT_PRESETS).map((preset) => {
-                        const isSelected = currentPreset.id === preset.id;
+                        const isSelected = Boolean(
+                          selectedPresetId &&
+                          (selectedPresetId === preset.id ||
+                            (businessSegment &&
+                              businessSegment.toLowerCase().includes(preset.id)))
+                        );
                         return (
                           <button
                             key={preset.id}
@@ -1617,14 +1633,23 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       })}
                     </div>
                     <p className="text-[11px] text-neutral-400 italic">
-                      As seções e funcionalidades abaixo são adaptadas especificamente para <strong>{currentPreset.name}</strong>.
+                      {selectedPresetId ? (
+                        <>
+                          As seções e funcionalidades abaixo são adaptadas especificamente para{' '}
+                          <strong>{currentPreset.name}</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Selecione o segmento do seu negócio para carregar as opções recomendadas.
+                        </>
+                      )}
                     </p>
                   </div>
 
                   {/* 2. ESTRUTURA RECOMENDADA PARA O SEGMENTO */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400">
-                      2. Estrutura de Páginas & Seções ({currentPreset.name}):
+                      2. Estrutura de Páginas & Seções{selectedPresetId ? ` (${currentPreset.name})` : ''}:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {currentPreset.defaultStructure.map((sec) => {
@@ -2190,16 +2215,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <div className="pt-2 border-t border-neutral-800/80 space-y-1.5 text-xs">
                   {(activePlan === 'Profissional' || activePlan === 'Premium') && (
                     <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-400 font-medium">Segmento Alvo:</span>
-                        <span className="text-white font-semibold">
-                          {currentPreset.name}
-                        </span>
-                      </div>
+                      {selectedPresetId && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-neutral-400 font-medium">Segmento Alvo:</span>
+                          <span className="text-white font-semibold">
+                            {currentPreset.name}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-neutral-400 font-medium">Estrutura:</span>
                         <span className="text-neutral-300 font-medium truncate max-w-[220px]">
-                          {selectedSecoes.length} seções selecionadas
+                          {selectedSecoes.length > 0
+                            ? `${selectedSecoes.length} seções selecionadas`
+                            : 'A definir com a equipe'}
                         </span>
                       </div>
                       {selectedAdvancedFeatures.length > 0 && (
@@ -2233,7 +2262,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-neutral-400 font-medium">Estilo / Atmosfera:</span>
                       <span className="text-white font-semibold">
-                        {selectedEstilos.join(', ')}
+                        {selectedEstilos.length > 0 ? selectedEstilos.join(', ') : 'A definir'}
                       </span>
                     </div>
                   )}
@@ -2243,7 +2272,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <span className="text-white font-semibold">
                       {colorPreference === 'custom'
                         ? customColorsText || 'Cores personalizadas'
-                        : 'Sugerida pela NexaWeb'}
+                        : colorPreference === 'suggest'
+                        ? 'Sugerida pela NexaWeb'
+                        : 'A definir'}
                     </span>
                   </div>
                   {selectedProject && (
@@ -2301,30 +2332,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         {!submitted && (
           <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-2.5 sm:gap-3 z-20">
             {stage === 'presentation' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0"
-                >
-                  Voltar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStage('briefing')}
-                  className={`flex-1 sm:flex-initial min-h-[44px] px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
-                >
-                  <span>Escolher este plano ({activePlan})</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => setStage('briefing')}
+                className={`w-full sm:w-auto sm:ml-auto min-h-[44px] px-6 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
+              >
+                <span>Escolher este plano ({activePlan})</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             ) : stage === 'briefing' ? (
               <>
                 <button
                   type="button"
-                  onClick={() => setStage('presentation')}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1"
+                  onClick={handleStepBack}
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0 gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Voltar</span>
@@ -2343,8 +2364,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={() => setStage('briefing')}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1"
+                  onClick={handleStepBack}
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0 gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Voltar</span>
@@ -2368,8 +2389,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={() => setStage('contact')}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1"
+                  onClick={handleStepBack}
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0 gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Voltar</span>

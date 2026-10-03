@@ -227,6 +227,7 @@ export default function App() {
   const [selectedProjectForBriefing, setSelectedProjectForBriefing] = useState<ProjectItem | null>(null);
   const [selectedInitialIntent, setSelectedInitialIntent] = useState<ModelIntentType>(null);
   const [selectedInitialDescription, setSelectedInitialDescription] = useState<string>('');
+  const [originProjectForModal, setOriginProjectForModal] = useState<ProjectItem | null>(null);
 
   // Auxiliary modals
   const [advisorModalOpen, setAdvisorModalOpen] = useState<boolean>(false);
@@ -238,8 +239,15 @@ export default function App() {
     const handlePopState = () => {
       if (activeProject) {
         setActiveProject(null);
+        setOriginProjectForModal(null);
       } else if (contactModalOpen) {
-        setContactModalOpen(false);
+        if (originProjectForModal) {
+          setContactModalOpen(false);
+          setActiveProject(originProjectForModal);
+          setOriginProjectForModal(null);
+        } else {
+          setContactModalOpen(false);
+        }
       } else if (advisorModalOpen) {
         setAdvisorModalOpen(false);
       } else if (startModalOpen) {
@@ -250,7 +258,7 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeProject, contactModalOpen, advisorModalOpen, startModalOpen, activeCategoryTab]);
+  }, [activeProject, contactModalOpen, originProjectForModal, advisorModalOpen, startModalOpen, activeCategoryTab]);
 
   // Opens briefing modal with specified plan or briefing category
   const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
@@ -261,6 +269,7 @@ export default function App() {
       'Premium',
     ];
 
+    setOriginProjectForModal(null);
     setSelectedProjectForBriefing(null);
     setSelectedInitialIntent('custom_idea');
     setSelectedInitialDescription('');
@@ -282,6 +291,7 @@ export default function App() {
 
   // Called when user selects a plan from PlansSection or PlanDetailModal
   const handleSelectPlan = (planId: PlanId, startAtBriefing = false) => {
+    setOriginProjectForModal(null);
     setSelectedProjectForBriefing(null);
     setSelectedServiceLevel(planId);
     setSelectedBriefingType(null);
@@ -293,6 +303,7 @@ export default function App() {
 
   // Called when user clicks "Quero um site deste formato" on any project card or modal
   const handleSelectFormat = (project: ProjectItem) => {
+    setOriginProjectForModal(project);
     setSelectedProjectForBriefing(project);
     setSelectedServiceLevel(project.tier as ServiceLevelType);
     setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
@@ -304,6 +315,7 @@ export default function App() {
 
   // Called when user starts a custom project from Segments or Hero
   const handleStartCustomIdea = (segmentName?: string) => {
+    setOriginProjectForModal(null);
     setSelectedProjectForBriefing(null);
     setSelectedServiceLevel('Personalizado');
     setSelectedBriefingType(segmentName || null);
@@ -311,12 +323,13 @@ export default function App() {
     setSelectedInitialDescription(
       segmentName ? `Gostaria de um site para o segmento de ${segmentName}. ` : ''
     );
-    setModalInitialStage('briefing');
+    setModalInitialStage('presentation');
     setContactModalOpen(true);
   };
 
   // Called when user wants to use a project as inspiration
   const handleUseAsInspiration = (project: ProjectItem) => {
+    setOriginProjectForModal(project);
     setSelectedProjectForBriefing(project);
     setSelectedServiceLevel('Personalizado');
     setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
@@ -324,7 +337,7 @@ export default function App() {
     setSelectedInitialDescription(
       `Gostaria de usar o projeto "${project.name}" (${project.category}) como inspiração para o meu site.`
     );
-    setModalInitialStage('briefing');
+    setModalInitialStage('presentation');
     setContactModalOpen(true);
   };
 
@@ -962,14 +975,19 @@ export default function App() {
         <React.Suspense fallback={null}>
           <ProjectModal
             project={activeProject}
-            onClose={() => setActiveProject(null)}
+            onClose={() => {
+              setActiveProject(null);
+              setOriginProjectForModal(null);
+            }}
             onOpenBriefing={handleOpenBriefing}
             onSelectPlan={handleSelectPlan}
             onSelectFormat={(proj) => {
+              setOriginProjectForModal(proj);
               setActiveProject(null);
               handleSelectFormat(proj);
             }}
             onUseAsInspiration={(proj) => {
+              setOriginProjectForModal(proj);
               setActiveProject(null);
               handleUseAsInspiration(proj);
             }}
@@ -990,13 +1008,29 @@ export default function App() {
               setSelectedInitialIntent(null);
               setSelectedInitialDescription('');
               setActiveProject(null);
+              setOriginProjectForModal(null);
             }}
             onBack={() => {
-              setContactModalOpen(false);
-              setSelectedProjectForBriefing(null);
-              setSelectedInitialIntent(null);
-              setSelectedInitialDescription('');
+              if (originProjectForModal) {
+                setContactModalOpen(false);
+                setActiveProject(originProjectForModal);
+                setOriginProjectForModal(null);
+              } else {
+                setContactModalOpen(false);
+                setSelectedProjectForBriefing(null);
+                setSelectedInitialIntent(null);
+                setSelectedInitialDescription('');
+              }
             }}
+            onBackToProject={
+              originProjectForModal
+                ? () => {
+                    setContactModalOpen(false);
+                    setActiveProject(originProjectForModal);
+                    setOriginProjectForModal(null);
+                  }
+                : undefined
+            }
             serviceLevel={selectedServiceLevel}
             briefingType={selectedBriefingType}
             selectedProject={selectedProjectForBriefing}

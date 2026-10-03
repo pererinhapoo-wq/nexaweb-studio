@@ -74,8 +74,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       onSelectPlan(project.tier);
     } else if (onOpenBriefing) {
       onOpenBriefing(project.briefingType || project.clientIndustry || project.tier);
+    } else {
+      onClose();
     }
-    onClose();
   };
 
   const isRealUrl = project.url && project.url !== '#' && project.url.startsWith('http');
@@ -84,7 +85,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-label={`Visão geral do projeto ${project.name}`}
@@ -97,15 +98,15 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="relative z-10 w-full max-w-5xl max-h-[92vh] bg-neutral-950 border border-neutral-800 rounded-3xl shadow-2xl text-neutral-100 flex flex-col overflow-hidden outline-none"
+        className="relative z-10 w-full max-w-5xl max-h-[92vh] max-h-[92dvh] bg-neutral-950 border border-neutral-800 rounded-2xl sm:rounded-3xl shadow-2xl text-neutral-100 flex flex-col overflow-hidden outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="shrink-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 bg-neutral-950/95 backdrop-blur-xl border-b border-neutral-800">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
+        <div className="shrink-0 z-20 flex items-center justify-between gap-3 px-4 sm:px-7 py-3 sm:py-3.5 bg-neutral-950/95 backdrop-blur-xl border-b border-neutral-800">
+          <div className="min-w-0 flex-1 pr-1">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border ${tierClass}`}
+                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border shrink-0 ${tierClass}`}
               >
                 {tierLabel}
               </span>
@@ -113,7 +114,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 {project.category}
               </span>
             </div>
-            <h2 className="text-lg sm:text-2xl font-bold font-display text-white truncate mt-0.5">
+            <h2 className="text-base sm:text-2xl font-bold font-display text-white truncate mt-1">
               {project.name}
             </h2>
           </div>
@@ -121,7 +122,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            className="shrink-0 min-h-[38px] min-w-[38px] p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center justify-center"
             aria-label="Fechar"
           >
             <X className="w-5 h-5" />
@@ -309,7 +310,6 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      onClose();
                       onUseAsInspiration(project);
                     }}
                     className="w-full min-h-[40px] inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 text-xs font-semibold border border-purple-500/25 transition-colors active:scale-[0.98]"
