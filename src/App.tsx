@@ -37,6 +37,7 @@ import { ShowcaseBanner } from './components/ShowcaseBanner';
 import { PlansSection } from './components/PlansSection';
 import { SegmentsShowcase } from './components/SegmentsShowcase';
 import type { PlanId } from './components/PlanDetailModal';
+import { AdminLogin } from './components/AdminLogin';
 
 // Code-split heavy modals and administration views so they do not load on first paint
 const AdminDashboard = React.lazy(() =>
@@ -60,6 +61,11 @@ export default function App() {
     return checkIsAdminRoute();
   });
 
+  // Estado de autorização administrativa validado exclusivamente pelo servidor
+  const [adminAuthStatus, setAdminAuthStatus] = useState<
+    'checking' | 'authenticated' | 'unauthenticated'
+  >('checking');
+
   const [activeCategoryTab, setActiveCategoryTab] = useState<
     'todos' | 'essencial' | 'profissional' | 'personalizado' | 'premium'
   >('todos');
@@ -73,6 +79,51 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
+
+  // Validação estrita da sessão administrativa no servidor via /api/admin-session
+  React.useEffect(() => {
+    if (!isAdminView) return;
+
+    let isMounted = true;
+    setAdminAuthStatus('checking');
+
+    fetch('/api/admin-session', {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data?.authenticated === true) {
+          setAdminAuthStatus('authenticated');
+        } else {
+          setAdminAuthStatus('unauthenticated');
+        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setAdminAuthStatus('unauthenticated');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdminView]);
+
+  const handleAdminLogout = async () => {
+    try {
+      await fetch('/api/admin-logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (e) {
+      console.error('Erro ao efetuar logout:', e);
+    } finally {
+      setAdminAuthStatus('unauthenticated');
+    }
+  };
 
   // Intercept any click to /admin, #admin or internal hash navigation globally
   React.useEffect(() => {
@@ -309,6 +360,30 @@ export default function App() {
   }, [searchQuery]);
 
   if (isAdminView) {
+    if (adminAuthStatus === 'checking') {
+      return (
+        <div className="min-h-screen bg-[#08090C] flex flex-col items-center justify-center text-neutral-400 gap-3">
+          <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-medium tracking-wide">
+            Verificando autorização...
+          </span>
+        </div>
+      );
+    }
+
+    if (adminAuthStatus === 'unauthenticated') {
+      return (
+        <AdminLogin
+          onSuccess={() => {
+            setAdminAuthStatus('authenticated');
+          }}
+          onBackToSite={() => {
+            navigateTo('/');
+          }}
+        />
+      );
+    }
+
     return (
       <React.Suspense
         fallback={
@@ -321,6 +396,7 @@ export default function App() {
           onBackToSite={() => {
             navigateTo('/');
           }}
+          onLogout={handleAdminLogout}
         />
       </React.Suspense>
     );

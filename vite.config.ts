@@ -21,6 +21,22 @@ export default defineConfig(() => {
             next();
           });
 
+          // Rotas de autenticação administrativa do proprietário
+          server.middlewares.use('/api/admin-login', async (req, res) => {
+            const { default: handler } = await import('./api/admin-login.ts');
+            await handler(req, res);
+          });
+
+          server.middlewares.use('/api/admin-session', async (req, res) => {
+            const { default: handler } = await import('./api/admin-session.ts');
+            await handler(req, res);
+          });
+
+          server.middlewares.use('/api/admin-logout', async (req, res) => {
+            const { default: handler } = await import('./api/admin-logout.ts');
+            await handler(req, res);
+          });
+
           // Mock da API de upload de briefings
           server.middlewares.use('/api/upload-briefing', (req, res) => {
             if (req.method === 'POST') {

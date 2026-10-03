@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Lock,
+  LogOut,
   Eye,
   Sparkles,
   Award,
@@ -95,6 +96,7 @@ export interface AdminProjectItem {
 
 interface AdminDashboardProps {
   onBackToSite: () => void;
+  onLogout?: () => void;
 }
 
 export type AdminTab =
@@ -106,7 +108,10 @@ export type AdminTab =
   | 'published'
   | 'settings';
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  onBackToSite,
+  onLogout,
+}) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
   // Briefings persistidos reais (inicia vazio se não houver dados reais no storage)
@@ -641,6 +646,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
             >
               Ver Site Público
             </button>
+
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-red-500/10 text-xs font-semibold text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/30 transition-colors inline-flex items-center gap-1.5"
+                title="Sair do painel administrativo"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sair</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
