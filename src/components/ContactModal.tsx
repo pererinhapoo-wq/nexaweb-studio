@@ -854,7 +854,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-label={`Briefing e Apresentação do Plano ${activePlan}`}
@@ -869,13 +869,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative z-10 w-full max-w-xl max-h-[92vh] max-h-[92dvh] flex flex-col bg-neutral-900 border rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${theme.border}`}
+        className={`relative z-10 w-full max-w-xl max-h-[90vh] max-h-[90dvh] flex flex-col bg-neutral-900 border rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${theme.border}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             MODAL HEADER (Pinned / Fixed Top)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="shrink-0 px-3.5 sm:px-6 py-3 sm:py-3.5 border-b border-neutral-800 bg-neutral-950/95 z-20">
+        <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-3.5 border-b border-neutral-800 bg-neutral-950/95 z-20">
           <div className="flex items-center justify-between gap-2.5 sm:gap-3">
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 pr-1">
               {onBackToProject && (
@@ -981,7 +981,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             MODAL BODY (Scrollable Central Content with overscroll-contain)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4.5 sm:px-6 py-4.5 sm:py-6 space-y-4.5 sm:space-y-5"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {submitted ? (
@@ -1067,8 +1067,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
             <div className="space-y-5 animate-fadeIn">
               {/* Plan Switcher Pills */}
-              {/* Plan Switcher Pills */}
-              <div className="p-1 sm:p-1.5 rounded-2xl bg-neutral-950 border border-neutral-800 grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-1 sm:gap-1.5">
+              <div className="p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-neutral-950 border border-neutral-800/90 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none overscroll-x-contain sm:justify-between touch-pan-x">
                 {(['Essencial', 'Personalizado', 'Profissional', 'Premium'] as PlanId[]).map(
                   (planTab) => {
                     const isTabActive = activePlan === planTab;
@@ -1077,7 +1076,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         key={planTab}
                         type="button"
                         onClick={() => setActivePlan(planTab)}
-                        className={`w-full sm:w-auto sm:flex-1 min-h-[38px] sm:min-h-[40px] py-2 px-2.5 sm:px-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                        className={`shrink-0 sm:shrink sm:flex-1 min-h-[34px] sm:min-h-[38px] py-1.5 px-3 sm:px-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1 ${
                           isTabActive
                             ? `${theme.badge} shadow-sm border font-extrabold`
                             : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
@@ -2344,7 +2343,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             MODAL FOOTER (Pinned / Fixed Bottom)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {!submitted && (
-          <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-2.5 sm:gap-3 z-20">
+          <div className="shrink-0 px-4.5 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-2.5 sm:gap-3 z-20">
             {stage === 'presentation' ? (
               <button
                 type="button"

@@ -303,7 +303,7 @@ export default function App() {
 
   // Called when user clicks "Quero um site deste formato" on any project card or modal
   const handleSelectFormat = (project: ProjectItem) => {
-    setOriginProjectForModal(project);
+    setOriginProjectForModal(null);
     setSelectedProjectForBriefing(project);
     setSelectedServiceLevel(project.tier as ServiceLevelType);
     setSelectedBriefingType(project.briefingType || project.clientIndustry || null);
