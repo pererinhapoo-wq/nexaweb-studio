@@ -4,21 +4,68 @@ import dotenv from 'dotenv';
 // Garante carregamento de variáveis de ambiente em ambientes locais ou serverless
 dotenv.config();
 
-export function parseCookies(req: any): Record<string, string> {
-  if (req?.cookies && typeof req.cookies === 'object') {
-    return req.cookies;
-  }
-  const list: Record<string, string> = {};
-  const cookieHeader = req?.headers?.cookie || req?.headers?.Cookie;
-  if (!cookieHeader || typeof cookieHeader !== 'string') return list;
+/**
+ * Duração segura da sessão administrativa: 24 horas (em segundos)
+ */
+export const SESSION_MAX_AGE = 24 * 60 * 60; // 86400 segundos
 
-  cookieHeader.split(';').forEach((cookie: string) => {
-    const parts = cookie.split('=');
-    const name = parts.shift()?.trim();
-    if (name) {
-      list[name] = decodeURIComponent(parts.join('='));
-    }
-  });
+/**
+ * Detecta se a conexão atual é segura (HTTPS), considerando proxies reversos
+ * e provedores serverless como Vercel, Cloud Run e ambientes de produção.
+ */
+export function isRequestSecure(req?: any): boolean {
+  if (req?.connection?.encrypted || req?.socket?.encrypted) {
+    return true;
+  }
+  const proto = req?.headers?.['x-forwarded-proto'];
+  if (typeof proto === 'string') {
+    const first = proto.split(',')[0].trim().toLowerCase();
+    if (first === 'https') return true;
+  }
+  if (req?.headers?.['x-forwarded-ssl'] === 'on') {
+    return true;
+  }
+  if (process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'production') {
+    return true;
+  }
+  const host = req?.headers?.host || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  if (process.env.NODE_ENV === 'production' && !isLocal) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Analisa cookies de forma resiliente tanto para Node.js nativo (Vite/Connect)
+ * quanto para ambientes serverless (Vercel/Next.js/Express).
+ */
+export function parseCookies(req: any): Record<string, string> {
+  const list: Record<string, string> = {};
+
+  // 1. Incorpora cookies já pré-analisados pelo framework se presentes
+  if (req?.cookies && typeof req.cookies === 'object') {
+    Object.assign(list, req.cookies);
+  }
+
+  // 2. Analisa o cabeçalho bruto Cookie (evita perda de cookies customizados)
+  const cookieHeader = req?.headers?.cookie || req?.headers?.Cookie;
+  if (cookieHeader && typeof cookieHeader === 'string') {
+    cookieHeader.split(';').forEach((pair: string) => {
+      const idx = pair.indexOf('=');
+      if (idx === -1) return;
+      const name = pair.slice(0, idx).trim();
+      const rawVal = pair.slice(idx + 1).trim();
+      if (!name) return;
+      const cleanVal = rawVal.replace(/^"|"$/g, '');
+      try {
+        list[name] = decodeURIComponent(cleanVal);
+      } catch {
+        list[name] = cleanVal;
+      }
+    });
+  }
+
   return list;
 }
 
@@ -93,7 +140,7 @@ export function createSessionToken(): string | null {
   const payload = {
     auth: true,
     iat: Date.now(),
-    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 dias de validade
+    exp: Date.now() + SESSION_MAX_AGE * 1000, // 24 horas de validade contínua
   };
 
   const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -118,12 +165,17 @@ export function verifySession(req: any): { authenticated: boolean } {
       return { authenticated: false };
     }
 
-    const parts = token.split('.');
-    if (parts.length !== 2) {
+    const dotIndex = token.indexOf('.');
+    if (dotIndex === -1) {
       return { authenticated: false };
     }
 
-    const [payloadB64, signature] = parts;
+    const payloadB64 = token.slice(0, dotIndex);
+    const signature = token.slice(dotIndex + 1);
+    if (!payloadB64 || !signature) {
+      return { authenticated: false };
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(payloadB64)
@@ -157,19 +209,19 @@ export function verifySession(req: any): { authenticated: boolean } {
 }
 
 export function serializeSessionCookie(token: string, req?: any): string {
-  const isProd =
-    process.env.NODE_ENV === 'production' ||
-    req?.headers?.['x-forwarded-proto'] === 'https';
+  const secure = isRequestSecure(req);
+  const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000).toUTCString();
 
   const parts = [
     `nexaweb_admin_session=${token}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    `Max-Age=${7 * 24 * 60 * 60}`,
+    `Max-Age=${SESSION_MAX_AGE}`,
+    `Expires=${expires}`,
   ];
 
-  if (isProd) {
+  if (secure) {
     parts.push('Secure');
   }
 
@@ -177,9 +229,7 @@ export function serializeSessionCookie(token: string, req?: any): string {
 }
 
 export function serializeLogoutCookie(req?: any): string {
-  const isProd =
-    process.env.NODE_ENV === 'production' ||
-    req?.headers?.['x-forwarded-proto'] === 'https';
+  const secure = isRequestSecure(req);
 
   const parts = [
     'nexaweb_admin_session=',
@@ -190,7 +240,7 @@ export function serializeLogoutCookie(req?: any): string {
     'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
   ];
 
-  if (isProd) {
+  if (secure) {
     parts.push('Secure');
   }
 
@@ -203,14 +253,21 @@ export function sendJson(
   data: any,
   headers: Record<string, string | string[]> = {}
 ) {
+  // Configura todos os cabeçalhos fornecidos
   if (typeof res.setHeader === 'function') {
     Object.entries(headers).forEach(([key, value]) => {
       res.setHeader(key, value);
     });
     res.setHeader('Content-Type', 'application/json');
-    res.statusCode = statusCode;
-    res.end(JSON.stringify(data));
-  } else if (typeof res.status === 'function' && typeof res.json === 'function') {
-    res.status(statusCode).json(data);
   }
+
+  // Compatibilidade com frameworks (Vercel Serverless, Express)
+  if (typeof res.status === 'function' && typeof res.json === 'function') {
+    res.status(statusCode).json(data);
+    return;
+  }
+
+  // Fallback nativo Node.js (Vite middleware / http.ServerResponse)
+  res.statusCode = statusCode;
+  res.end(JSON.stringify(data));
 }

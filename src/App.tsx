@@ -14,7 +14,6 @@ import {
   Layers,
   ArrowRight,
   ArrowLeft,
-  Lock,
 } from 'lucide-react';
 import { checkIsAdminRoute, navigateTo, subscribeToRoute } from './router';
 import {
@@ -89,8 +88,11 @@ export default function App() {
 
     fetch('/api/admin-session', {
       method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
       headers: {
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
       },
     })
       .then((res) => res.json())
@@ -116,7 +118,13 @@ export default function App() {
     try {
       await fetch('/api/admin-logout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
       });
     } catch (e) {
       console.error('Erro ao efetuar logout:', e);
@@ -409,9 +417,6 @@ export default function App() {
         onOpenContact={handleOpenBriefing}
         onOpenAdvisor={() => setAdvisorModalOpen(true)}
         onStartProject={() => setStartModalOpen(true)}
-        onOpenAdmin={() => {
-          navigateTo('/admin');
-        }}
       />
 
       {/* Main Content */}
@@ -791,20 +796,6 @@ export default function App() {
                   <span className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.2 rounded-full font-bold">
                     3 Sites no Ar
                   </span>
-
-                  {/* Acesso discreto ao Admin da NexaWeb em Amostras Profissional */}
-                  <a
-                    href="/admin"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigateTo('/admin');
-                    }}
-                    className="min-w-[44px] min-h-[44px] p-2 rounded text-neutral-700 hover:text-emerald-400 transition-colors opacity-40 hover:opacity-100 ml-0.5 inline-flex items-center justify-center"
-                    title="Acesso Administrativo"
-                    aria-label="Acesso Administrativo"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                  </a>
                 </div>
 
                 <button
@@ -964,7 +955,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer onOpenAdmin={() => setIsAdminView(true)} />
+      <Footer />
 
       {/* Project Inspector Modal */}
       {activeProject && (

@@ -1,9 +1,9 @@
 import React from 'react';
-import { ArrowUpRight, Shield, Sparkles, Award, Sliders, CheckCircle2, Instagram, Lock } from 'lucide-react';
+import { ArrowUpRight, Shield, Sparkles, Award, Sliders, CheckCircle2, Instagram } from 'lucide-react';
 import { ESSENCIAL_PROJECTS, PROFISSIONAL_PROJECTS, PREMIUM_PROJECTS } from '../data/projects';
 import { NEXAWEB_CONTACT } from '../config/contact';
 
-export const Footer: React.FC<{ onOpenAdmin?: () => void }> = ({ onOpenAdmin }) => {
+export const Footer: React.FC = () => {
   return (
     <footer className="border-t border-neutral-800/80 bg-neutral-950 text-neutral-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">

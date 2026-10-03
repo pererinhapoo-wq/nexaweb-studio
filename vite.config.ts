@@ -4,6 +4,57 @@ import path from 'path';
 import fs from 'fs';
 import { defineConfig } from 'vite';
 
+function setupAdminMiddlewares(server: any) {
+  // Garante que requisições para /admin ou /admin/ entreguem admin.html
+  server.middlewares.use((req: any, _res: any, next: any) => {
+    const url = req.url?.split('?')[0] || '';
+    if (url === '/admin' || url === '/admin/') {
+      req.url = '/admin.html';
+    }
+    next();
+  });
+
+  // Rotas de autenticação administrativa do proprietário
+  server.middlewares.use('/api/admin-login', async (req: any, res: any) => {
+    const { default: handler } = await import('./api/admin-login.ts');
+    await handler(req, res);
+  });
+
+  server.middlewares.use('/api/admin-session', async (req: any, res: any) => {
+    const { default: handler } = await import('./api/admin-session.ts');
+    await handler(req, res);
+  });
+
+  server.middlewares.use('/api/admin-logout', async (req: any, res: any) => {
+    const { default: handler } = await import('./api/admin-logout.ts');
+    await handler(req, res);
+  });
+
+  // Mock da API de upload de briefings
+  server.middlewares.use('/api/upload-briefing', (req: any, res: any) => {
+    if (req.method === 'POST') {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        const randomId = Math.random().toString(36).substring(2, 9);
+        const mockUrl =
+          'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80';
+        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            url: mockUrl,
+            pathname: `briefings/${Date.now()}-${randomId}.jpg`,
+          })
+        );
+      });
+    } else {
+      res.statusCode = 405;
+      res.end('Method Not Allowed');
+    }
+  });
+}
+
 export default defineConfig(() => {
   return {
     plugins: [
@@ -12,63 +63,10 @@ export default defineConfig(() => {
       {
         name: 'nexaweb-admin-routing-plugin',
         configureServer(server) {
-          // Garante que requisições para /admin ou /admin/ entreguem index.html/admin.html
-          server.middlewares.use((req, _res, next) => {
-            const url = req.url?.split('?')[0] || '';
-            if (url === '/admin' || url === '/admin/') {
-              req.url = '/admin.html';
-            }
-            next();
-          });
-
-          // Rotas de autenticação administrativa do proprietário
-          server.middlewares.use('/api/admin-login', async (req, res) => {
-            const { default: handler } = await import('./api/admin-login.ts');
-            await handler(req, res);
-          });
-
-          server.middlewares.use('/api/admin-session', async (req, res) => {
-            const { default: handler } = await import('./api/admin-session.ts');
-            await handler(req, res);
-          });
-
-          server.middlewares.use('/api/admin-logout', async (req, res) => {
-            const { default: handler } = await import('./api/admin-logout.ts');
-            await handler(req, res);
-          });
-
-          // Mock da API de upload de briefings
-          server.middlewares.use('/api/upload-briefing', (req, res) => {
-            if (req.method === 'POST') {
-              const chunks: Buffer[] = [];
-              req.on('data', (chunk: Buffer) => chunks.push(chunk));
-              req.on('end', () => {
-                const randomId = Math.random().toString(36).substring(2, 9);
-                const mockUrl =
-                  'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80';
-                res.setHeader('Content-Type', 'application/json');
-                res.statusCode = 200;
-                res.end(
-                  JSON.stringify({
-                    url: mockUrl,
-                    pathname: `briefings/${Date.now()}-${randomId}.jpg`,
-                  })
-                );
-              });
-            } else {
-              res.statusCode = 405;
-              res.end('Method Not Allowed');
-            }
-          });
+          setupAdminMiddlewares(server);
         },
         configurePreviewServer(server) {
-          server.middlewares.use((req, _res, next) => {
-            const url = req.url?.split('?')[0] || '';
-            if (url === '/admin' || url === '/admin/') {
-              req.url = '/admin.html';
-            }
-            next();
-          });
+          setupAdminMiddlewares(server);
         },
         closeBundle() {
           try {

@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, ArrowUpRight, Sparkles, HelpCircle, Lock } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Sparkles, HelpCircle } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { navigateTo } from '../router';
 
 interface NavbarProps {
   onOpenContact: (level?: string | null) => void;
   onOpenAdvisor?: () => void;
   onStartProject?: () => void;
-  onOpenAdmin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenContact,
   onOpenAdvisor,
   onStartProject,
-  onOpenAdmin,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -93,15 +90,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     });
   };
 
-  const handleAdminClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    setMobileMenuOpen(false);
-    if (onOpenAdmin) {
-      onOpenAdmin();
-    } else {
-      navigateTo('/admin');
-    }
-  };
 
   const handleStart = () => {
     setMobileMenuOpen(false);
@@ -396,17 +384,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <ArrowUpRight className="w-3.5 h-3.5 text-neutral-500" />
                   </a>
 
-                  {/* Opção discreta de acesso ao Admin */}
-                  <div className="pt-2 mt-1 border-t border-neutral-900">
-                    <a
-                      href="/admin"
-                      onClick={handleAdminClick}
-                      className="min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900/60 transition-colors text-xs font-medium"
-                    >
-                      <Lock className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>Admin</span>
-                    </a>
-                  </div>
+
                 </nav>
               </div>
 

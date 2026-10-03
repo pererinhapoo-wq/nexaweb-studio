@@ -24,8 +24,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     try {
       const response = await fetch('/api/admin-login', {
         method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         },
         body: JSON.stringify({ password }),
       });

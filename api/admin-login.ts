@@ -18,24 +18,55 @@ export default async function handler(req: any, res: any) {
 
     const verification = verifyPassword(password);
     if (verification.status !== 200) {
-      return sendJson(res, verification.status, {
-        error: verification.error || 'Não foi possível verificar a autenticação.',
-      });
+      return sendJson(
+        res,
+        verification.status,
+        {
+          error: verification.error || 'Não foi possível verificar a autenticação.',
+        },
+        {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        }
+      );
     }
 
     const token = createSessionToken();
     if (!token) {
-      return sendJson(res, 503, {
-        error: 'Autenticação administrativa não configurada.',
-      });
+      return sendJson(
+        res,
+        503,
+        {
+          error: 'Autenticação administrativa não configurada.',
+        },
+        {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        }
+      );
     }
 
     const cookie = serializeSessionCookie(token, req);
     res.setHeader?.('Set-Cookie', cookie);
-    return sendJson(res, 200, { authenticated: true });
+
+    return sendJson(
+      res,
+      200,
+      { authenticated: true },
+      {
+        'Set-Cookie': cookie,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+      }
+    );
   } catch (error) {
-    return sendJson(res, 500, {
-      error: 'Não foi possível verificar a autenticação.',
-    });
+    return sendJson(
+      res,
+      500,
+      {
+        error: 'Não foi possível verificar a autenticação.',
+      },
+      {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      }
+    );
   }
 }
