@@ -479,11 +479,11 @@ export default function App() {
 
             {/* Subtitles */}
             <p className="text-xs sm:text-sm md:text-base text-neutral-300 font-normal leading-relaxed max-w-2xl mx-auto">
-              Conheça alguns dos sites desenvolvidos pela NexaWeb para diferentes tipos de negócios.
+              Criação de sites profissionais para empresas, negócios e profissionais autônomos. Conheça as demonstrações publicadas pela NexaWeb e solicite um projeto sob medida para o seu segmento.
             </p>
 
             <p className="text-[11px] sm:text-xs text-neutral-400 max-w-xl mx-auto">
-              Exemplos reais e publicados desenvolvidos com design moderno, alta velocidade e total adaptação para computadores e celulares.
+              Exemplos reais desenvolvidos com design moderno, alta velocidade, total adaptação para celulares e integração com seus canais de atendimento.
             </p>
 
             {/* Hero Main Action Buttons */}
@@ -896,7 +896,7 @@ export default function App() {
               Por que a NexaWeb é a escolha certa?
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400">
-              Qualidade estética, design responsivo de alto nível e velocidade de carregamento para o seu negócio.
+              Desenvolvimento e criação de sites profissionais com design responsivo de alto nível, velocidade de carregamento e foco na conversão do seu negócio.
             </p>
           </div>
 

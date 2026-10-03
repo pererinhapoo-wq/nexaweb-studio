@@ -195,7 +195,7 @@ export const ProjectCardImage: React.FC<ProjectCardImageProps> = ({
           <img
             key={activeImageSrc}
             src={activeImageSrc}
-            alt={`Captura da demonstração ${project.name} - NexaWeb`}
+            alt={`Demonstração de site profissional para ${project.category.toLowerCase()} — ${project.name}`}
             width={600}
             height={375}
             loading={priority ? 'eager' : 'lazy'}

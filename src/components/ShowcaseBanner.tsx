@@ -406,7 +406,7 @@ export const ShowcaseBanner: React.FC<ShowcaseBannerProps> = ({
                   <img
                     key={activeImageSrc}
                     src={activeImageSrc}
-                    alt={`Prévia do projeto ${currentProject.name}`}
+                    alt={`Demonstração de site profissional para ${currentProject.category.toLowerCase()} — ${currentProject.name}`}
                     width={800}
                     height={500}
                     loading="eager"
