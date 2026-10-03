@@ -841,7 +841,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-label={`Briefing e Apresentação do Plano ${activePlan}`}
@@ -856,7 +856,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative z-10 w-full max-w-xl max-h-[92vh] flex flex-col bg-neutral-900 border rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${theme.border}`}
+        className={`relative z-10 w-full max-w-xl max-h-[92vh] max-h-[92dvh] flex flex-col bg-neutral-900 border rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${theme.border}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -972,7 +972,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             MODAL BODY (Scrollable Central Content with overscroll-contain)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4.5 sm:px-6 sm:py-6 space-y-5"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {submitted ? (
@@ -1058,7 +1058,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
             <div className="space-y-5 animate-fadeIn">
               {/* Plan Switcher Pills */}
-              <div className="p-1 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-1 overflow-x-auto">
+              <div className="p-1.5 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center gap-1.5 overflow-x-auto scrollbar-none overscroll-x-contain sm:justify-between">
                 {(['Essencial', 'Personalizado', 'Profissional', 'Premium'] as PlanId[]).map(
                   (planTab) => {
                     const isTabActive = activePlan === planTab;
@@ -1067,10 +1067,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         key={planTab}
                         type="button"
                         onClick={() => setActivePlan(planTab)}
-                        className={`flex-1 min-h-[36px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                        className={`shrink-0 sm:shrink sm:flex-1 min-h-[40px] py-2 px-3.5 sm:px-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
                           isTabActive
                             ? `${theme.badge} shadow-sm border`
-                            : 'text-neutral-400 hover:text-neutral-200'
+                            : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
                         }`}
                       >
                         <span>{planTab}</span>
@@ -1082,7 +1082,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
               {/* Selected Model Reference Banner (if came from a real project) */}
               {selectedProject && (
-                <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center justify-between gap-3">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-amber-400">
                       <Sparkles className="w-4 h-4" />
@@ -1104,7 +1104,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               )}
 
               {/* Price & Delivery Time Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950/90 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4.5 sm:p-5 rounded-2xl bg-neutral-950/90 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     Investimento Oficial
@@ -1112,12 +1112,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   <div className="text-2xl sm:text-3xl font-extrabold font-display text-white">
                     {planData.price}
                   </div>
-                  <p className="text-xs text-neutral-400">{planData.tagline}</p>
+                  <p className="text-xs text-neutral-400 leading-relaxed">{planData.tagline}</p>
                 </div>
 
-                <div className="sm:text-right space-y-1">
+                <div className="sm:text-right space-y-1 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-neutral-800/80">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex sm:justify-end items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
+                    <Clock className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Prazo de Entrega</span>
                   </span>
                   <div className="text-xs sm:text-sm font-semibold text-neutral-200">
@@ -1127,7 +1127,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </div>
 
               {/* Short Description */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
                   Visão Geral do Plano
                 </h4>
@@ -1137,7 +1137,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </div>
 
               {/* Target Audience */}
-              <div className="p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
                   <Laptop className="w-3.5 h-3.5 text-neutral-400" />
                   <span>Este plano é ideal para:</span>
@@ -1148,15 +1148,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </div>
 
               {/* Inclusions */}
-              <div className="space-y-2">
+              <div className="space-y-2 sm:space-y-2.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
                   O que está incluído no {planData.name}:
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                   {planData.inclusions.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-start gap-2 p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/70"
+                      className="flex items-start gap-2.5 p-3 sm:p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800/70"
                     >
                       <Check className={`w-3.5 h-3.5 ${theme.text} shrink-0 mt-0.5`} />
                       <span className="text-xs text-neutral-300 leading-relaxed">
@@ -1168,15 +1168,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </div>
 
               {/* Differentials */}
-              <div className="space-y-2">
+              <div className="space-y-2 sm:space-y-2.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
                   Diferenciais:
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                   {planData.differentials.map((diff, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 text-xs text-neutral-300"
+                      className="flex items-center gap-2.5 p-2.5 sm:p-2 rounded-xl bg-neutral-950/40 border border-neutral-800/50 text-xs text-neutral-300"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                       <span>{diff}</span>
@@ -1184,6 +1184,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* Bottom breathing space before pinned footer */}
+              <div className="h-2 sm:h-0" aria-hidden="true" />
             </div>
           ) : stage === 'briefing' ? (
             /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2296,13 +2299,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             MODAL FOOTER (Pinned / Fixed Bottom)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {!submitted && (
-          <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-3 z-20">
+          <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-2.5 sm:gap-3 z-20">
             {stage === 'presentation' ? (
               <>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0"
                 >
                   Voltar
                 </button>
@@ -2310,7 +2313,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStage('briefing')}
-                  className={`flex-1 sm:flex-initial min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
+                  className={`flex-1 sm:flex-initial min-h-[44px] px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
                 >
                   <span>Escolher este plano ({activePlan})</span>
                   <ArrowRight className="w-4 h-4" />

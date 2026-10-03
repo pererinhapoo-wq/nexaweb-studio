@@ -76,7 +76,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn"
       role="dialog"
       aria-modal="true"
       onTouchMove={(e) => {
@@ -88,7 +88,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative z-10 w-full max-w-2xl max-h-[92vh] flex flex-col bg-neutral-900 border rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${colorStyles.border}`}
+        className={`relative z-10 w-full max-w-2xl max-h-[92vh] max-h-[92dvh] flex flex-col bg-neutral-900 border rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100 outline-none ${colorStyles.border}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Fixed Top */}
@@ -124,7 +124,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
 
         {/* Content Body - Central Scrollable */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-7 space-y-6"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4.5 sm:p-7 space-y-5 sm:space-y-6"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {/* Price & Turnaround Box */}
@@ -201,14 +201,16 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
               ))}
             </div>
           </div>
+          {/* Bottom breathing space before pinned footer */}
+          <div className="h-2 sm:h-0" aria-hidden="true" />
         </div>
 
         {/* Footer - Fixed Bottom */}
-        <div className="shrink-0 p-4 sm:p-5 border-t border-neutral-800 bg-neutral-950/95 flex flex-col sm:flex-row items-center justify-between gap-3 z-20">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/95 flex items-center justify-between gap-2.5 sm:gap-3 z-20">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0"
           >
             Voltar
           </button>
@@ -219,7 +221,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
               onClose();
               onSelectPlan(plan.id);
             }}
-            className={`w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${colorStyles.btn}`}
+            className={`flex-1 sm:flex-initial min-h-[44px] px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${colorStyles.btn}`}
           >
             <span>Escolher este plano ({plan.name})</span>
             <ArrowRight className="w-4 h-4" />
