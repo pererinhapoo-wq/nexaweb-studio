@@ -80,6 +80,7 @@ export interface AdminBriefingItem {
 }
 
 export type ProjectStatus =
+  | 'Novo'
   | 'Planejamento'
   | 'Em desenvolvimento'
   | 'Em revisão'
@@ -99,6 +100,11 @@ export interface AdminProjectItem {
   progressPercent?: number;
   currentStage?: string;
   headlineMessage?: string;
+  clientId?: string;
+  clientBusinessName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  estimatedDeliveryDate?: string;
 }
 
 interface AdminDashboardProps {
@@ -271,6 +277,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       console.warn('Erro ao salvar projetos:', e);
     }
   };
+
+  // Carregar projetos reais do Supabase via /api/admin-projects
+  const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(false);
+
+  const loadRemoteProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const res = await fetch('/api/admin-projects', {
+        method: 'GET',
+        credentials: 'same-origin',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.projects)) {
+          const remoteFormatted: AdminProjectItem[] = data.projects.map((rp: any) => ({
+            id: rp.id, // UUID real do Supabase
+            clientName: rp.clientName,
+            projectName: rp.projectName,
+            plan: rp.plan || 'Essencial',
+            status: (rp.status || 'Planejamento') as ProjectStatus,
+            url: rp.productionUrl || undefined,
+            stagingUrl: rp.stagingUrl || undefined,
+            date: rp.createdAt ? rp.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+            progressPercent: rp.progressPercent,
+            currentStage: rp.currentStage,
+            headlineMessage: rp.headlineMessage,
+            clientId: rp.clientId || undefined,
+            clientBusinessName: rp.clientBusinessName || undefined,
+            clientEmail: rp.clientEmail || undefined,
+            clientPhone: rp.clientPhone || undefined,
+            estimatedDeliveryDate: rp.estimatedDeliveryDate || undefined,
+          }));
+
+          // Preserva projetos manuais antigos salvos em localStorage que não estejam no Supabase
+          const savedPStr = localStorage.getItem('nexaweb_admin_projects');
+          let localList: AdminProjectItem[] = [];
+          if (savedPStr) {
+            try {
+              localList = JSON.parse(savedPStr);
+            } catch {
+              localList = [];
+            }
+          }
+          const remoteIds = new Set(remoteFormatted.map((p) => p.id));
+          const localOnly = localList.filter((lp) => !remoteIds.has(lp.id));
+
+          const merged = [...remoteFormatted, ...localOnly];
+          setProjects(merged);
+          try {
+            localStorage.setItem('nexaweb_admin_projects', JSON.stringify(merged));
+          } catch (e) {
+            console.warn('Erro ao atualizar cache local de projetos:', e);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Notice: carregamento de projetos via API em fallback local:', err);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRemoteProjects();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'projects') {
+      loadRemoteProjects();
+    }
+  }, [activeTab]);
 
   // Ações de Briefings
   const handleUpdateBriefingStatus = (id: string, newStatus: BriefingStatus) => {
@@ -791,6 +868,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const projectStatusColor = (st: ProjectStatus) => {
     switch (st) {
+      case 'Novo':
+        return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
       case 'Planejamento':
         return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
       case 'Em desenvolvimento':
@@ -801,6 +880,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
       case 'Entregue':
         return 'bg-teal-500/15 text-teal-300 border-teal-500/30';
+      default:
+        return 'bg-neutral-800 text-neutral-300 border-neutral-700';
     }
   };
 
@@ -1332,14 +1413,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsNewProjectModalOpen(true)}
-                className="min-h-[40px] px-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-md shadow-amber-400/15"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Novo Projeto</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadRemoteProjects}
+                  disabled={isLoadingProjects}
+                  className="min-h-[40px] px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Sincronizar projetos do banco de dados"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingProjects ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span className="hidden sm:inline">Sincronizar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNewProjectModalOpen(true)}
+                  className="min-h-[40px] px-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-md shadow-amber-400/15"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Novo Projeto</span>
+                </button>
+              </div>
             </div>
 
             {filteredProjects.length === 0 ? (
@@ -1371,6 +1465,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           className={`h-8 px-2 rounded-lg text-xs font-semibold outline-none border ${projectStatusColor(p.status)} bg-neutral-950`}
                           aria-label="Alterar status do projeto"
                         >
+                          <option value="Novo">Novo</option>
                           <option value="Planejamento">Planejamento</option>
                           <option value="Em desenvolvimento">Em desenvolvimento</option>
                           <option value="Em revisão">Em revisão</option>
@@ -1444,6 +1539,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 className={`h-8 px-2 rounded-lg text-xs font-semibold outline-none border ${projectStatusColor(p.status)} bg-neutral-950`}
                                 aria-label="Alterar status do projeto"
                               >
+                                <option value="Novo">Novo</option>
                                 <option value="Planejamento">Planejamento</option>
                                 <option value="Em desenvolvimento">Em desenvolvimento</option>
                                 <option value="Em revisão">Em revisão</option>
@@ -2284,6 +2380,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white outline-none focus:border-amber-400"
                     aria-label="Status do projeto"
                   >
+                    <option value="Novo">Novo</option>
                     <option value="Planejamento">Planejamento</option>
                     <option value="Em desenvolvimento">Em desenvolvimento</option>
                     <option value="Em revisão">Em revisão</option>
@@ -2576,6 +2673,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white outline-none focus:border-cyan-400 font-medium"
                     aria-label="Status operacional"
                   >
+                    <option value="Novo">Novo</option>
                     <option value="Planejamento">Planejamento</option>
                     <option value="Em desenvolvimento">Em desenvolvimento</option>
                     <option value="Em revisão">Em revisão</option>
