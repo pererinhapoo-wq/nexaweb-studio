@@ -65,6 +65,7 @@ export type BriefingStatus =
 
 export interface AdminBriefingItem {
   id: string;
+  projectId?: string | null;
   clientName: string;
   businessName: string;
   businessSegment: string;
@@ -253,6 +254,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     isPublished: false,
     notes: '',
   });
+
+  // Arquivos associados ao briefing selecionado
+  const [briefingFiles, setBriefingFiles] = useState<
+    Array<{
+      name: string;
+      url: string;
+      isImage: boolean;
+      size?: number;
+      createdAt?: string;
+    }>
+  >([]);
+  const [isLoadingBriefingFiles, setIsLoadingBriefingFiles] = useState<boolean>(false);
+
+  // Visualização ampliada de imagem do briefing (lightbox)
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+
+  // Busca e sincroniza arquivos do briefing selecionado
+  useEffect(() => {
+    // Limpa imediatamente o estado ao alternar ou carregar briefing para evitar manter arquivos anteriores
+    setBriefingFiles([]);
+
+    if (!selectedBriefing) {
+      setIsLoadingBriefingFiles(false);
+      return;
+    }
+
+    // 1. Carrega arquivos já presentes no objeto do briefing (localStorage ou upload direto)
+    const directFiles: any[] =
+      (selectedBriefing as any).files ||
+      (selectedBriefing as any).fileUrls ||
+      [];
+
+    if (Array.isArray(directFiles) && directFiles.length > 0) {
+      const normalized = directFiles.map((f: any, idx: number) => {
+        if (typeof f === 'string') {
+          const isImg = /\.(jpe?g|png|webp|gif|svg)/i.test(f) || f.startsWith('data:image/');
+          return {
+            name: `Arquivo ${idx + 1}`,
+            url: f,
+            isImage: isImg,
+          };
+        }
+        return {
+          name: f.name || `Arquivo ${idx + 1}`,
+          url: f.url || f.path,
+          isImage: f.isImage ?? Boolean(/\.(jpe?g|png|webp|gif|svg)/i.test(f.name || f.url || '')),
+          size: f.size,
+        };
+      });
+      setBriefingFiles(normalized);
+    }
+
+    // 2. Busca arquivos privados armazenados no Supabase Storage via API com URLs assinadas
+    const fetchSignedBriefingFiles = async () => {
+      setIsLoadingBriefingFiles(true);
+      try {
+        const params = new URLSearchParams({
+          action: 'briefing-files',
+          projectId: selectedBriefing.projectId || '',
+          briefingId: selectedBriefing.id || '',
+          filesCount: String(selectedBriefing.filesCount || 0),
+        });
+
+        const res = await fetch(`/api/admin-projects?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBriefingFiles(Array.isArray(data?.files) ? data.files : []);
+        } else {
+          setBriefingFiles([]);
+        }
+      } catch (err) {
+        console.warn('Recuperação de arquivos do briefing notice:', err);
+        setBriefingFiles([]);
+      } finally {
+        setIsLoadingBriefingFiles(false);
+      }
+    };
+
+    fetchSignedBriefingFiles();
+  }, [selectedBriefing]);
 
   // Sincronização entre abas e eventos do storage
   useEffect(() => {
@@ -2351,6 +2432,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
+              {/* Seção: Arquivos enviados */}
+              <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 block text-[10px]">ARQUIVOS ENVIADOS</span>
+                  {briefingFiles.length > 0 && (
+                    <span className="text-[10px] font-mono text-amber-400">
+                      {briefingFiles.length} arquivo(s)
+                    </span>
+                  )}
+                </div>
+
+                {isLoadingBriefingFiles ? (
+                  <div className="flex items-center gap-2 py-1 text-xs text-neutral-400">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    <span>Carregando arquivos do Supabase Storage...</span>
+                  </div>
+                ) : briefingFiles.length === 0 ? (
+                  <p className="text-neutral-500 text-xs italic py-1">Nenhum arquivo enviado.</p>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {/* Miniaturas de Imagens */}
+                    {briefingFiles.some((f) => f.isImage) && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {briefingFiles
+                          .filter((f) => f.isImage)
+                          .map((file, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setPreviewImage({ url: file.url, name: file.name })}
+                              className="group relative aspect-video bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 hover:border-amber-400/80 transition-all text-left focus:outline-none"
+                              title="Clique para visualizar maior"
+                            >
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Eye className="w-4 h-4 text-white drop-shadow" />
+                              </div>
+                              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-1">
+                                <p className="text-[10px] font-mono text-neutral-200 truncate">{file.name}</p>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Lista de Outros Arquivos (PDFs, Docs, etc.) */}
+                    {briefingFiles.some((f) => !f.isImage) && (
+                      <div className="space-y-1.5 pt-1">
+                        {briefingFiles
+                          .filter((f) => !f.isImage)
+                          .map((file, idx) => (
+                            <a
+                              key={idx}
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 transition-colors text-xs text-neutral-300 hover:text-white"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span className="truncate font-mono text-[11px]">{file.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-neutral-400 hover:text-amber-400 shrink-0 ml-2">
+                                <ExternalLink className="w-3 h-3" />
+                                <span className="text-[10px]">Abrir</span>
+                              </div>
+                            </a>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
                 <span className="text-neutral-400 font-semibold">Alterar Status:</span>
                 <select
@@ -2385,6 +2545,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODAL: VISUALIZAÇÃO AMPLIADA DE IMAGEM DO BRIEFING
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-fadeIn"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-4 shadow-2xl flex flex-col items-center w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-semibold text-neutral-300 truncate max-w-sm">
+                {previewImage.name}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImage.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[32px] px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  title="Abrir em nova aba"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span className="text-[11px]">Abrir Original</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(null)}
+                  className="min-h-[32px] min-w-[32px] rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
+                  aria-label="Fechar visualização"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-2 sm:p-4 flex items-center justify-center overflow-auto max-h-[78vh] w-full">
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="max-h-[72vh] w-auto max-w-full object-contain rounded-lg shadow-lg"
+              />
             </div>
           </div>
         </div>

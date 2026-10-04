@@ -47,15 +47,35 @@ export default async function handler(req: any, res: any) {
       },
     });
 
-    let fileBuffer: Buffer | null = null;
+    let fileBuffer: any = null;
     let fileMimeType = '';
     let fileName = '';
     let fileTooLarge = false;
     let fileReceived = false;
+    let receivedProjectId = '';
+
+    // Aceita projectId vindo tanto via query string quanto via campo multipart
+    if (typeof req.query?.projectId === 'string') {
+      receivedProjectId = req.query.projectId.trim();
+    } else if (typeof req.url === 'string' && req.url.includes('?')) {
+      try {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const qp = urlParams.get('projectId');
+        if (qp) receivedProjectId = qp.trim();
+      } catch {
+        // ignora erro de parse da url
+      }
+    }
 
     const chunks: Buffer[] = [];
 
     await new Promise<void>((resolve, reject) => {
+      busboy.on('field', (fieldname: string, val: string) => {
+        if (fieldname === 'projectId' && val) {
+          receivedProjectId = val.trim();
+        }
+      });
+
       busboy.on(
         'file',
         (
@@ -100,6 +120,30 @@ export default async function handler(req: any, res: any) {
       req.pipe(busboy);
     });
 
+    // 1. Validação estrita de formato UUID v4 do projectId
+    const cleanProjectId = (receivedProjectId || '').trim();
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    if (!cleanProjectId || !UUID_REGEX.test(cleanProjectId)) {
+      return res.status(400).json({
+        error: 'Identificador do projeto (projectId) inválido ou ausente.',
+      });
+    }
+
+    // 2. Validação no banco com Service Role: o projeto precisa existir na tabela public.projects
+    const { data: projectRecord, error: projectErr } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', cleanProjectId)
+      .single();
+
+    if (projectErr || !projectRecord) {
+      return res.status(404).json({
+        error: 'Projeto associado não encontrado no banco de dados.',
+      });
+    }
+
     if (!fileReceived || !fileBuffer) {
       return res.status(400).json({
         error: 'Nenhum arquivo foi enviado.',
@@ -126,8 +170,9 @@ export default async function handler(req: any, res: any) {
 
     const extension = getExtension(fileName, fileMimeType);
 
+    // Caminho determinístico obrigatório: briefings/{projectId}/{timestamp}-{randomId}.{extension}
     const pathname =
-      `briefings/${Date.now()}-${cryptoRandomId()}.${extension}`;
+      `briefings/${cleanProjectId}/${Date.now()}-${cryptoRandomId()}.${extension}`;
 
     const { error } = await supabase.storage
       .from('nexaweb-vault')

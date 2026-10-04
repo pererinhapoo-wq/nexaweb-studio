@@ -740,21 +740,29 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setUploadStatus('idle');
   };
 
-  const uploadPhotos = async (): Promise<string[]> => {
+  const uploadPhotos = async (targetProjectId?: string): Promise<string[]> => {
     if (!photoFiles.length) return [];
+    if (!targetProjectId) {
+      console.warn('Upload de fotos cancelado: targetProjectId ausente.');
+      return [];
+    }
     setUploadingPhotos(true);
     setUploadError('');
 
     try {
-      const uploadedUrls: string[] = [];
+      const uploadedPaths: string[] = [];
       for (const file of photoFiles) {
         const formDataToUpload = new FormData();
         formDataToUpload.append('file', file);
+        formDataToUpload.append('projectId', targetProjectId);
 
-        const response = await fetch('/api/upload-briefing', {
-          method: 'POST',
-          body: formDataToUpload,
-        });
+        const response = await fetch(
+          `/api/upload-briefing?projectId=${encodeURIComponent(targetProjectId)}`,
+          {
+            method: 'POST',
+            body: formDataToUpload,
+          }
+        );
 
         if (!response.ok) {
           const data = await response.json().catch(() => null);
@@ -762,13 +770,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         }
 
         const data = await response.json();
-        if (data?.url) {
-          uploadedUrls.push(data.url);
+        if (data?.pathname) {
+          uploadedPaths.push(data.pathname);
+        } else if (data?.url) {
+          uploadedPaths.push(data.url);
         }
       }
-      setUploadedPhotoUrls(uploadedUrls);
+      setUploadedPhotoUrls(uploadedPaths);
       setUploadStatus('success');
-      return uploadedUrls;
+      return uploadedPaths;
     } catch (error: any) {
       console.warn('Upload fotos status notice:', error?.message);
       // Honest, transparent feedback: do not crash the flow, inform client clearly
@@ -809,11 +819,51 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     if (isSubmitting) return;
     setIsSubmitting(true);
 
-    if (photoFiles.length > 0) {
-      await uploadPhotos();
+    // 1. Criação prioritária do briefing e projeto no Supabase para obter o projectId determinístico
+    let createdProjectId: string | null = null;
+    try {
+      const supabaseResponse = await fetch('/api/create-briefing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientName: clientName.trim() || 'Cliente NexaWeb',
+          businessName: businessName.trim() || 'Nova Empresa',
+          clientEmail: clientEmail.trim(),
+          clientPhone: clientPhone.trim(),
+          clientNotes: clientNotes.trim(),
+          plan: activePlan,
+          briefingSummary: rawBriefingSummary,
+        }),
+      });
+
+      if (supabaseResponse.ok) {
+        const supabaseData = await supabaseResponse.json().catch(() => null);
+        if (supabaseData?.projectId) {
+          createdProjectId = supabaseData.projectId;
+        }
+      } else {
+        const errorData = await supabaseResponse.json().catch(() => null);
+        console.warn(
+          'Supabase briefing notice:',
+          errorData?.error || supabaseResponse.status
+        );
+      }
+    } catch (supabaseErr: any) {
+      console.warn(
+        'Supabase briefing dispatch notice:',
+        supabaseErr?.message || 'rede'
+      );
     }
 
-    // 1. Envio seguro e centralizado para o Forminit (sem interromper o cliente se houver falha de rede)
+    // 2. Upload determinístico dos arquivos associados ao projectId gerado
+    let uploadedPaths: string[] = [];
+    if (photoFiles.length > 0 && createdProjectId) {
+      uploadedPaths = await uploadPhotos(createdProjectId);
+    }
+
+    // 3. Envio seguro e centralizado para o Forminit (sem interromper o cliente se houver falha de rede)
     try {
       const forminitEndpoint =
         NEXAWEB_CONTACT.forminitEndpoint || 'https://forminit.com/f/mzismx0n5tn';
@@ -927,38 +977,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       console.warn('Forminit dispatch notice:', forminitErr?.message || 'rede');
     }
 
-    // 2. Preservação estrita do salvamento local para funcionamento contínuo do Admin
-        // 2. Salvamento do briefing no Supabase
-    try {
-      const supabaseResponse = await fetch('/api/create-briefing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clientName: clientName.trim() || 'Cliente NexaWeb',
-          businessName: businessName.trim() || 'Nova Empresa',
-          clientEmail: clientEmail.trim(),
-          clientPhone: clientPhone.trim(),
-          clientNotes: clientNotes.trim(),
-          plan: activePlan,
-          briefingSummary: rawBriefingSummary,
-        }),
-      });
-
-      if (!supabaseResponse.ok) {
-        const errorData = await supabaseResponse.json().catch(() => null);
-        console.warn(
-          'Supabase briefing notice:',
-          errorData?.error || supabaseResponse.status
-        );
-      }
-    } catch (supabaseErr: any) {
-      console.warn(
-        'Supabase briefing dispatch notice:',
-        supabaseErr?.message || 'rede'
-      );
-        }
+    // 4. Preservação estrita do salvamento local para funcionamento contínuo do Admin
     try {
       // Save submitted briefing to local storage so NexaWeb Admin can view and manage it
       const savedBriefingsStr = localStorage.getItem('nexaweb_admin_briefings');
@@ -969,6 +988,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
       const newBriefing = {
         id: `BRF-${now.getFullYear()}-${newIdNumber}`,
+        projectId: createdProjectId || null,
         clientName: clientName.trim() || 'Cliente NexaWeb',
         businessName: businessName.trim() || 'Nova Empresa',
         businessSegment: businessSegment.trim() || (selectedProject ? selectedProject.category : 'Geral'),
@@ -989,6 +1009,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         referenceModel: selectedProject ? selectedProject.name : undefined,
         estimatedPrice: planData.price,
         filesCount: photoFiles.length,
+        files: uploadedPaths,
       };
 
       const updated = [newBriefing, ...existingBriefings];

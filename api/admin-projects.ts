@@ -42,8 +42,123 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  // Previne cache em respostas administrativas
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+  }
+
+  // Extrai parâmetros de consulta (suporta req.query ou parse de req.url)
+  const queryParams: Record<string, string> = {};
+  if (req.query && typeof req.query === 'object') {
+    Object.assign(queryParams, req.query);
+  }
+  if (typeof req.url === 'string' && req.url.includes('?')) {
+    try {
+      const searchPart = req.url.split('?')[1];
+      const parsed = new URLSearchParams(searchPart);
+      parsed.forEach((val, key) => {
+        queryParams[key] = val;
+      });
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  // 4. Ação: Buscar arquivos do briefing no Supabase Storage exclusivamente por projectId determinístico
+  if (queryParams.action === 'briefing-files') {
+    try {
+      const cleanProjectId = (queryParams.projectId || '').trim();
+      const UUID_REGEX =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      // 1. Validação estrita de formato UUID v4
+      if (!cleanProjectId || !UUID_REGEX.test(cleanProjectId)) {
+        return res.status(200).json({
+          success: true,
+          files: [],
+        });
+      }
+
+      // 2. Validação no banco com Service Role: confirma que o projectId realmente existe
+      const { data: projectRecord, error: projectErr } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', cleanProjectId)
+        .single();
+
+      if (projectErr || !projectRecord) {
+        return res.status(200).json({
+          success: true,
+          files: [],
+        });
+      }
+
+      // 3. Listagem estrita: consulta exclusivamente a pasta 'briefings/{projectId}' no bucket privado
+      const targetFolder = `briefings/${cleanProjectId}`;
+      const { data: storageObjects, error: storageErr } = await supabase.storage
+        .from('nexaweb-vault')
+        .list(targetFolder, {
+          limit: 100,
+          sortBy: { column: 'created_at', order: 'desc' },
+        });
+
+      if (storageErr || !storageObjects || storageObjects.length === 0) {
+        return res.status(200).json({
+          success: true,
+          files: [],
+        });
+      }
+
+      // 4. Gera URLs assinadas temporárias válidas por 1 hora exclusivamente para os arquivos da pasta
+      const formattedFiles: Array<{
+        name: string;
+        path: string;
+        url: string;
+        isImage: boolean;
+        size?: number;
+        createdAt?: string;
+      }> = [];
+
+      for (const file of storageObjects) {
+        if (!file.name) continue;
+        const fullPath = `${targetFolder}/${file.name}`;
+        const { data: signedUrlData, error: signErr } = await supabase.storage
+          .from('nexaweb-vault')
+          .createSignedUrl(fullPath, 60 * 60);
+
+        if (!signErr && signedUrlData?.signedUrl) {
+          const isImage = /\.(jpe?g|png|webp|gif|svg)$/i.test(file.name);
+          const cleanDisplayName = file.name
+            .replace(/^\d+[-_]/, '')
+            .replace(/^[0-9a-fA-F-]{20,}[-_]/, '');
+
+          formattedFiles.push({
+            name: cleanDisplayName || file.name,
+            path: fullPath,
+            url: signedUrlData.signedUrl,
+            isImage,
+            size: file.metadata?.size,
+            createdAt: file.created_at || undefined,
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        files: formattedFiles,
+      });
+    } catch (filesErr) {
+      console.error('Erro ao recuperar arquivos determinísticos do briefing:', filesErr);
+      return res.status(200).json({
+        success: true,
+        files: [],
+      });
+    }
+  }
+
   try {
-    // 4. Busca os projetos reais existentes na tabela public.projects
+    // 5. Busca os projetos reais existentes na tabela public.projects
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select(`
