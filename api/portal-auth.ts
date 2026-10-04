@@ -5,7 +5,7 @@ import {
   createClientSessionToken,
   serializeClientSessionCookie,
   parseJsonBody,
-} from './portal-session';
+} from './portal-session.ts';
 
 const supabaseUrl =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;

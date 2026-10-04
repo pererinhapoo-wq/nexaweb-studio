@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { isRequestSecure, parseCookies, parseJsonBody } from './_session';
+import { isRequestSecure, parseCookies, parseJsonBody } from './_session.ts';
 
 dotenv.config();
 

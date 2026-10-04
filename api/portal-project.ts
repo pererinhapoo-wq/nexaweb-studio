@@ -1,6 +1,6 @@
 // @ts-ignore
 import { createClient } from '@supabase/supabase-js';
-import { verifyClientSession } from './portal-session';
+import { verifyClientSession } from './portal-session.ts';
 
 const supabaseUrl =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
