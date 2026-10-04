@@ -1,5 +1,4 @@
-import formidable from 'formidable';
-import fs from 'fs/promises';
+import Busboy from 'busboy';
 import { createClient } from '@supabase/supabase-js';
 
 export const config = {
@@ -8,7 +7,9 @@ export const config = {
   },
 };
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseUrl =
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase =
@@ -30,20 +31,84 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const form = formidable({
-      multiples: false,
-      maxFileSize: 15 * 1024 * 1024,
+    const contentType = req.headers['content-type'] || '';
+
+    if (!contentType.includes('multipart/form-data')) {
+      return res.status(400).json({
+        error: 'Formato de envio inválido.',
+      });
+    }
+
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+        files: 1,
+      },
     });
 
-    const [, files] = await form.parse(req);
+    let fileBuffer: Buffer | null = null;
+    let fileMimeType = '';
+    let fileName = '';
+    let fileTooLarge = false;
+    let fileReceived = false;
 
-    const uploadedFile = Array.isArray(files.file)
-      ? files.file[0]
-      : files.file;
+    const chunks: Buffer[] = [];
 
-    if (!uploadedFile) {
+    await new Promise<void>((resolve, reject) => {
+      busboy.on(
+        'file',
+        (
+          fieldname: string,
+          file: NodeJS.ReadableStream,
+          info: {
+            filename: string;
+            encoding: string;
+            mimeType: string;
+          }
+        ) => {
+          if (fieldname !== 'file') {
+            file.resume();
+            return;
+          }
+
+          fileReceived = true;
+          fileName = info.filename || 'imagem';
+          fileMimeType = info.mimeType || '';
+
+          file.on('data', (chunk: Buffer) => {
+            chunks.push(chunk);
+          });
+
+          file.on('limit', () => {
+            fileTooLarge = true;
+          });
+        }
+      );
+
+      busboy.on('finish', () => {
+        try {
+          fileBuffer = Buffer.concat(chunks);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      busboy.on('error', reject);
+
+      req.pipe(busboy);
+    });
+
+    if (!fileReceived || !fileBuffer) {
       return res.status(400).json({
         error: 'Nenhum arquivo foi enviado.',
+      });
+    }
+
+    if (fileTooLarge || fileBuffer.length > 15 * 1024 * 1024) {
+      return res.status(413).json({
+        error: 'O arquivo excede o limite de 15 MB.',
       });
     }
 
@@ -53,26 +118,21 @@ export default async function handler(req: any, res: any) {
       'image/webp',
     ];
 
-    if (!allowedTypes.includes(uploadedFile.mimetype || '')) {
+    if (!allowedTypes.includes(fileMimeType)) {
       return res.status(400).json({
         error: 'Apenas imagens JPG, PNG ou WEBP são permitidas.',
       });
     }
 
-    const buffer = await fs.readFile(uploadedFile.filepath);
+    const extension = getExtension(fileName, fileMimeType);
 
-    const originalName = uploadedFile.originalFilename || 'imagem';
-    const extension =
-      originalName.includes('.')
-        ? originalName.split('.').pop()
-        : 'jpg';
-
-    const pathname = `briefings/${Date.now()}-${cryptoRandomId()}.${extension}`;
+    const pathname =
+      `briefings/${Date.now()}-${cryptoRandomId()}.${extension}`;
 
     const { error } = await supabase.storage
       .from('nexaweb-vault')
-      .upload(pathname, buffer, {
-        contentType: uploadedFile.mimetype || 'application/octet-stream',
+      .upload(pathname, fileBuffer, {
+        contentType: fileMimeType,
         upsert: false,
       });
 
@@ -85,8 +145,8 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(200).json({
-      pathname,
       success: true,
+      pathname,
     });
   } catch (error) {
     console.error('Erro ao fazer upload:', error);
@@ -98,5 +158,29 @@ export default async function handler(req: any, res: any) {
 }
 
 function cryptoRandomId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return (
+    Math.random().toString(36).slice(2) +
+    Date.now().toString(36)
+  );
 }
+
+function getExtension(
+  filename: string,
+  mimeType: string
+) {
+  const match = filename.match(/\.([a-zA-Z0-9]+)$/);
+
+  if (match?.[1]) {
+    return match[1].toLowerCase();
+  }
+
+  if (mimeType === 'image/png') {
+    return 'png';
+  }
+
+  if (mimeType === 'image/webp') {
+    return 'webp';
+  }
+
+  return 'jpg';
+                            }
