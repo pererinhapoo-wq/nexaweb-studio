@@ -53,6 +53,13 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (clientError) {
+      console.error('CREATE_BRIEFING_CLIENT_ERROR', {
+        code: clientError.code,
+        message: clientError.message,
+        details: clientError.details,
+        hint: clientError.hint,
+      });
+
       console.error('Erro ao criar cliente:', clientError);
 
       return res.status(500).json({
