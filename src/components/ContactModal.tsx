@@ -248,7 +248,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   // Hook 2: submitted
   const [submitted, setSubmitted] = useState(false);
 
-  // Hook 2b: copiedSummary
+  // Hook 2b: isSubmitting (previne envios duplicados)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Hook 2c: copiedSummary
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Hook 3: stage (presentation -> briefing -> contact -> review)
@@ -601,6 +604,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     if (!isOpen) return;
 
     setSubmitted(false);
+    setIsSubmitting(false);
     setStage(initialStage || 'presentation'); // Start with Presentation unless opened explicitly from plan detail
     setValidationErrors({});
     setPhotoFiles([]);
@@ -802,10 +806,128 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     if (photoFiles.length > 0) {
       await uploadPhotos();
     }
 
+    // 1. Envio seguro e centralizado para o Forminit (sem interromper o cliente se houver falha de rede)
+    try {
+      const forminitEndpoint =
+        NEXAWEB_CONTACT.forminitEndpoint || 'https://forminit.com/f/mzismx0n5tn';
+
+      const forminitData = new FormData();
+
+      // Identificação do cliente e blocos oficiais do Forminit
+      const cleanClientName = clientName.trim() || 'Cliente NexaWeb';
+      forminitData.append('fi-sender-fullName', cleanClientName);
+      forminitData.append('name', cleanClientName);
+
+      if (clientEmail.trim()) {
+        forminitData.append('fi-sender-email', clientEmail.trim());
+        forminitData.append('email', clientEmail.trim());
+      }
+
+      if (clientPhone.trim()) {
+        forminitData.append('fi-sender-phone', clientPhone.trim());
+        forminitData.append('phone', clientPhone.trim());
+      }
+
+      // Dados estruturados do negócio e projeto
+      if (businessName.trim()) {
+        forminitData.append('empresa', businessName.trim());
+      }
+
+      if (businessSegment.trim()) {
+        forminitData.append('segmento', businessSegment.trim());
+      }
+
+      if (businessServices.trim()) {
+        forminitData.append('servicos_principais', businessServices.trim());
+      }
+
+      forminitData.append('plano', activePlan);
+      forminitData.append('investimento', planData.price);
+      forminitData.append('prazo_estimado', planData.turnaroundTime);
+
+      if (selectedProject) {
+        forminitData.append('modelo_referencia', selectedProject.name);
+        forminitData.append('intencao_modelo', modelIntent || 'custom_idea');
+      }
+
+      if (selectedEstilos.length > 0) {
+        forminitData.append('estilos_visuais', selectedEstilos.join(', '));
+      }
+
+      if (selectedSecoes.length > 0) {
+        forminitData.append('secoes_selecionadas', selectedSecoes.join(', '));
+      }
+
+      if (selectedFuncionalidades.length > 0) {
+        const featNames = selectedFuncionalidades.map((id) => FEATURE_CATALOG[id]?.name || id);
+        forminitData.append('funcionalidades', featNames.join(', '));
+      }
+
+      if (selectedAdvancedFeatures.length > 0) {
+        const advNames = selectedAdvancedFeatures.map((id) => FEATURE_CATALOG[id]?.name || id);
+        forminitData.append('modulos_avancados', advNames.join(', '));
+      }
+
+      if (selectedRealtimeFeatures.length > 0) {
+        const rtNames = selectedRealtimeFeatures.map((id) => FEATURE_CATALOG[id]?.name || id);
+        forminitData.append('recursos_tempo_real', rtNames.join(', '));
+      }
+
+      if (selectedAccountRoles.length > 0) {
+        forminitData.append('niveis_acesso', selectedAccountRoles.join(', '));
+      }
+
+      if (colorPreference || customColorsText) {
+        forminitData.append('preferencia_cores', customColorsText || colorPreference || '');
+      }
+
+      if (referenceUrl.trim()) {
+        forminitData.append('links_referencia', referenceUrl.trim());
+      }
+
+      if (customDescription.trim()) {
+        forminitData.append('visao_projeto', customDescription.trim());
+      }
+
+      if (clientNotes.trim()) {
+        forminitData.append('observacoes', clientNotes.trim());
+      }
+
+      // Resumo formatado consolidado
+      forminitData.append('resumo_completo', rawBriefingSummary);
+
+      // Arquivos e imagens anexadas (suporte nativo do Forminit para uploads)
+      if (photoFiles.length > 0) {
+        photoFiles.forEach((file) => {
+          forminitData.append('fi-file-anexos', file);
+          forminitData.append('files', file);
+        });
+      }
+
+      const response = await fetch(forminitEndpoint, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+        },
+        body: forminitData,
+      });
+
+      if (!response.ok) {
+        console.warn('Forminit submit response status notice:', response.status);
+      }
+    } catch (forminitErr: any) {
+      // Registro seguro de diagnóstico sem vazar dados pessoais nem interromper o usuário
+      console.warn('Forminit dispatch notice:', forminitErr?.message || 'rede');
+    }
+
+    // 2. Preservação estrita do salvamento local para funcionamento contínuo do Admin
     try {
       // Save submitted briefing to local storage so NexaWeb Admin can view and manage it
       const savedBriefingsStr = localStorage.getItem('nexaweb_admin_briefings');
@@ -842,6 +964,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       localStorage.setItem('nexaweb_admin_briefings', JSON.stringify(updated));
     } catch (err) {
       console.warn('Storage briefing notice:', err);
+    } finally {
+      setIsSubmitting(false);
     }
 
     setSubmitted(true);
@@ -2412,10 +2536,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <button
                   type="button"
                   onClick={handleFinalSubmit}
-                  disabled={uploadingPhotos}
+                  disabled={uploadingPhotos || isSubmitting}
                   className={`flex-1 sm:flex-initial min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
                 >
-                  {uploadingPhotos ? (
+                  {isSubmitting ? (
+                    <span>Enviando briefing...</span>
+                  ) : uploadingPhotos ? (
                     <span>Enviando fotos...</span>
                   ) : (
                     <>

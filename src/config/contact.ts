@@ -20,6 +20,10 @@ export const NEXAWEB_CONTACT = {
   // E-mail comercial para contato formal
   commercialEmail: 'contato@nexaweb.com.br',
 
+  // Forminit Oficial para Briefings
+  forminitFormId: 'mzismx0n5tn',
+  forminitEndpoint: 'https://forminit.com/f/mzismx0n5tn',
+
   // Localização / Atendimento
   operatingHours: 'Segunda a Sexta · 09h às 18h',
   region: 'Brasil · Atendimento 100% Remoto',
