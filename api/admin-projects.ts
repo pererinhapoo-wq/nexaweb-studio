@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { verifySession } from './_session';
+import { verifySession } from './_session.ts';
 
 dotenv.config();
 
