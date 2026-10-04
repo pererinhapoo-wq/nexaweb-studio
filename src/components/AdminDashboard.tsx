@@ -314,11 +314,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         method: 'GET',
         credentials: 'same-origin',
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.success && Array.isArray(data.requests)) {
-          setClientRequests(data.requests);
-        }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+
+        console.error('[NexaWeb] Erro ao carregar solicitações:', {
+          status: res.status,
+          message: errorData?.error || errorData?.message || 'Erro desconhecido',
+        });
+
+        return;
+      }
+
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.requests)) {
+        setClientRequests(data.requests);
       }
     } catch (e) {
       console.warn('Notice: erro ao carregar solicitações do cliente:', e);
