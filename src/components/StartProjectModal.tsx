@@ -82,7 +82,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
         </div>
 
         {/* 3 Starting Options */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4.5 sm:p-6 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 sm:p-6 space-y-2.5 sm:space-y-3">
           {/* Option 1: Choose from existing samples */}
           <button
             type="button"
@@ -90,19 +90,19 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
               onClose();
               onChooseSample();
             }}
-            className="w-full text-left p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-amber-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
+            className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-amber-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
                   <Layout className="w-4 h-4" />
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-white group-hover:text-amber-200 transition-colors">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-bold text-white group-hover:text-amber-200 transition-colors leading-snug">
                       Escolher a partir de uma amostra
                     </p>
-                    <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 px-2 py-0.2 rounded">
+                    <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/25 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                       22 no ar
                     </span>
                   </div>
@@ -111,7 +111,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
                   </p>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 shrink-0 mt-1 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 shrink-0 transition-colors" />
             </div>
           </button>
 
@@ -122,19 +122,19 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
               onClose();
               onChooseCustomIdea();
             }}
-            className="w-full text-left p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-purple-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
+            className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-purple-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
                   <Lightbulb className="w-4 h-4" />
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors leading-snug">
                       Tenho uma ideia própria / Projeto sob medida
                     </p>
-                    <span className="text-[10px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.2 rounded">
+                    <span className="text-[10px] font-bold text-purple-300 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                       Exclusivo
                     </span>
                   </div>
@@ -143,7 +143,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
                   </p>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-purple-400 shrink-0 mt-1 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-purple-400 shrink-0 transition-colors" />
             </div>
           </button>
 
@@ -154,19 +154,19 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
               onClose();
               onChoosePlanDirectly();
             }}
-            className="w-full text-left p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
+            className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-400/50 hover:bg-neutral-950 transition-all group active:scale-[0.99]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
                   <Shield className="w-4 h-4" />
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-white group-hover:text-emerald-200 transition-colors">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-bold text-white group-hover:text-emerald-200 transition-colors leading-snug">
                       Escolher direto um dos 4 Planos
                     </p>
-                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.2 rounded">
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                       Comercial
                     </span>
                   </div>
@@ -175,7 +175,7 @@ export const StartProjectModal: React.FC<StartProjectModalProps> = ({
                   </p>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-emerald-400 shrink-0 mt-1 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-emerald-400 shrink-0 transition-colors" />
             </div>
           </button>
         </div>

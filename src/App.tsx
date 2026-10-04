@@ -54,6 +54,9 @@ const PlanAdvisorModal = React.lazy(() =>
 const StartProjectModal = React.lazy(() =>
   import('./components/StartProjectModal').then((m) => ({ default: m.StartProjectModal }))
 );
+const SamplePickerModal = React.lazy(() =>
+  import('./components/SamplePickerModal').then((m) => ({ default: m.SamplePickerModal }))
+);
 
 export default function App() {
   const [isAdminView, setIsAdminView] = useState<boolean>(() => {
@@ -232,6 +235,7 @@ export default function App() {
   // Auxiliary modals
   const [advisorModalOpen, setAdvisorModalOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
+  const [samplePickerModalOpen, setSamplePickerModalOpen] = useState<boolean>(false);
   const [modalInitialStage, setModalInitialStage] = useState<BriefingStage>('presentation');
 
   // Handle mobile and browser back navigation seamlessly
@@ -252,13 +256,15 @@ export default function App() {
         setAdvisorModalOpen(false);
       } else if (startModalOpen) {
         setStartModalOpen(false);
+      } else if (samplePickerModalOpen) {
+        setSamplePickerModalOpen(false);
       } else if (activeCategoryTab !== 'todos') {
         setActiveCategoryTab('todos');
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeProject, contactModalOpen, originProjectForModal, advisorModalOpen, startModalOpen, activeCategoryTab]);
+  }, [activeProject, contactModalOpen, originProjectForModal, advisorModalOpen, startModalOpen, samplePickerModalOpen, activeCategoryTab]);
 
   // Opens briefing modal with specified plan or briefing category
   const handleOpenBriefing = (level: ServiceLevelType | string | null = null) => {
@@ -1059,15 +1065,35 @@ export default function App() {
             isOpen={startModalOpen}
             onClose={() => setStartModalOpen(false)}
             onChooseSample={() => {
-              const element = document.getElementById('modelos');
-              element?.scrollIntoView({ behavior: 'smooth' });
+              setSamplePickerModalOpen(true);
             }}
             onChooseCustomIdea={() => {
               handleStartCustomIdea();
             }}
             onChoosePlanDirectly={() => {
-              const element = document.getElementById('planos');
-              element?.scrollIntoView({ behavior: 'smooth' });
+              handleSelectPlan('Essencial');
+            }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Sample Picker ("Escolher a partir de uma amostra") Modal */}
+      {samplePickerModalOpen && (
+        <React.Suspense fallback={null}>
+          <SamplePickerModal
+            isOpen={samplePickerModalOpen}
+            onClose={() => setSamplePickerModalOpen(false)}
+            onBack={() => {
+              setSamplePickerModalOpen(false);
+              setStartModalOpen(true);
+            }}
+            onSelectFormat={(proj) => {
+              setSamplePickerModalOpen(false);
+              handleSelectFormat(proj);
+            }}
+            onPreviewProject={(proj) => {
+              setSamplePickerModalOpen(false);
+              setActiveProject(proj);
             }}
           />
         </React.Suspense>
