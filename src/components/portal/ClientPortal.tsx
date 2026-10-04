@@ -14,6 +14,8 @@ import {
   Shield,
   Loader2,
   Calendar,
+  Plus,
+  X,
 } from 'lucide-react';
 import { ClientPortalLogin } from './ClientPortalLogin';
 import type {
@@ -40,6 +42,14 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
   const [requests, setRequests] = useState<PortalRequest[]>([]);
   const [reviews, setReviews] = useState<PortalReview[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Estado do Modal de Nova Solicitação do Cliente
+  const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
+  const [requestCategory, setRequestCategory] = useState<string>('Ajuste de Design');
+  const [requestTitle, setRequestTitle] = useState<string>('');
+  const [requestDescription, setRequestDescription] = useState<string>('');
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState<boolean>(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   // Captura eventual parâmetro de token na URL ao montar
   useEffect(() => {
@@ -102,6 +112,65 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
     // Para encerrar visualmente a sessão no cliente e retornar ao login
     setViewState('unauthenticated');
     setProject(null);
+  };
+
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanTitle = requestTitle.trim();
+    const cleanDescription = requestDescription.trim();
+
+    if (!cleanTitle) {
+      setRequestError('Por favor, informe o título da solicitação.');
+      return;
+    }
+    if (cleanTitle.length < 3) {
+      setRequestError('O título deve ter no mínimo 3 caracteres.');
+      return;
+    }
+    if (!cleanDescription) {
+      setRequestError('Por favor, descreva os detalhes da sua solicitação.');
+      return;
+    }
+    if (cleanDescription.length < 5) {
+      setRequestError('A descrição deve ter no mínimo 5 caracteres.');
+      return;
+    }
+
+    setIsSubmittingRequest(true);
+    setRequestError(null);
+
+    try {
+      const response = await fetch('/api/portal-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          category: requestCategory,
+          title: cleanTitle,
+          description: cleanDescription,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.status === 201 && data?.success && data.request) {
+        // Insere a nova solicitação imediatamente no início da lista do cliente
+        setRequests((prev) => [data.request, ...prev]);
+        setIsNewRequestModalOpen(false);
+        setRequestTitle('');
+        setRequestDescription('');
+        setRequestCategory('Ajuste de Design');
+        setRequestError(null);
+      } else {
+        setRequestError(data?.error || 'Não foi possível enviar a solicitação. Tente novamente.');
+      }
+    } catch {
+      setRequestError('Falha na comunicação com o servidor. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
   };
 
   // 1. Estado de Carregamento
@@ -397,10 +466,23 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
           <div className="space-y-6">
             {/* Solicitações Cadastradas */}
             <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 space-y-4">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-cyan-400" />
-                Solicitações e Briefing
-              </h2>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-cyan-400" />
+                  Solicitações e Briefing
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestError(null);
+                    setIsNewRequestModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nova Solicitação</span>
+                </button>
+              </div>
 
               {requests.length === 0 ? (
                 <p className="text-xs text-slate-500">
@@ -477,6 +559,139 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
           </div>
         </div>
       </main>
+
+      {/* Modal: Formulário de Nova Solicitação */}
+      {isNewRequestModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-request-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => {
+            if (!isSubmittingRequest) {
+              setIsNewRequestModalOpen(false);
+              setRequestError(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4 text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-cyan-400" />
+                <h3 id="new-request-modal-title" className="text-base font-bold text-white">
+                  Nova Solicitação
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSubmittingRequest) {
+                    setIsNewRequestModalOpen(false);
+                    setRequestError(null);
+                  }
+                }}
+                disabled={isSubmittingRequest}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                aria-label="Fechar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {requestError && (
+              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">{requestError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateRequest} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label htmlFor="request-category-select" className="text-slate-300 font-semibold block">
+                  Categoria
+                </label>
+                <select
+                  id="request-category-select"
+                  value={requestCategory}
+                  onChange={(e) => setRequestCategory(e.target.value)}
+                  disabled={isSubmittingRequest}
+                  className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-cyan-400 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <option value="Ajuste de Design">Ajuste de Design</option>
+                  <option value="Troca de Conteúdo">Troca de Conteúdo</option>
+                  <option value="Dúvida">Dúvida</option>
+                  <option value="Correção">Correção</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="request-title-input" className="text-slate-300 font-semibold block">
+                  Título da Solicitação
+                </label>
+                <input
+                  id="request-title-input"
+                  type="text"
+                  maxLength={150}
+                  value={requestTitle}
+                  onChange={(e) => setRequestTitle(e.target.value)}
+                  placeholder="Ex: Ajustar imagens ou texto do banner principal"
+                  disabled={isSubmittingRequest}
+                  className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-400 transition-colors disabled:opacity-50"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="request-description-textarea" className="text-slate-300 font-semibold block">
+                  Descrição
+                </label>
+                <textarea
+                  id="request-description-textarea"
+                  rows={4}
+                  maxLength={3000}
+                  value={requestDescription}
+                  onChange={(e) => setRequestDescription(e.target.value)}
+                  placeholder="Descreva com detalhes o que precisa ser feito ou alterado..."
+                  disabled={isSubmittingRequest}
+                  className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-400 transition-colors resize-none leading-relaxed disabled:opacity-50"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewRequestModalOpen(false);
+                    setRequestError(null);
+                  }}
+                  disabled={isSubmittingRequest}
+                  className="py-2.5 px-4 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingRequest}
+                  className="inline-flex items-center gap-2 py-2.5 px-5 rounded-xl font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors shadow-sm shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingRequest ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <span>Enviar Solicitação</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
