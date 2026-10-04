@@ -928,6 +928,37 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     }
 
     // 2. Preservação estrita do salvamento local para funcionamento contínuo do Admin
+        // 2. Salvamento do briefing no Supabase
+    try {
+      const supabaseResponse = await fetch('/api/create-briefing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientName: clientName.trim() || 'Cliente NexaWeb',
+          businessName: businessName.trim() || 'Nova Empresa',
+          clientEmail: clientEmail.trim(),
+          clientPhone: clientPhone.trim(),
+          clientNotes: clientNotes.trim(),
+          plan: activePlan,
+          briefingSummary: rawBriefingSummary,
+        }),
+      });
+
+      if (!supabaseResponse.ok) {
+        const errorData = await supabaseResponse.json().catch(() => null);
+        console.warn(
+          'Supabase briefing notice:',
+          errorData?.error || supabaseResponse.status
+        );
+      }
+    } catch (supabaseErr: any) {
+      console.warn(
+        'Supabase briefing dispatch notice:',
+        supabaseErr?.message || 'rede'
+      );
+        }
     try {
       // Save submitted briefing to local storage so NexaWeb Admin can view and manage it
       const savedBriefingsStr = localStorage.getItem('nexaweb_admin_briefings');
