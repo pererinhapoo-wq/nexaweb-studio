@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ExternalLink,
   Layers,
@@ -50,6 +50,46 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
   const [requestDescription, setRequestDescription] = useState<string>('');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState<boolean>(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  // Filtros de Categoria e Modal de Detalhes da Solicitação
+  const [requestCategoryFilter, setRequestCategoryFilter] = useState<string>('Todos');
+  const [selectedRequestDetails, setSelectedRequestDetails] = useState<PortalRequest | null>(null);
+
+  // 7 categorias oficiais rigorosamente preservadas
+  const REQUEST_CATEGORIES = [
+    'Todos',
+    'Ajuste de Design',
+    'Troca de Conteúdo',
+    'Dúvida',
+    'Correção',
+    'Outro',
+    'Briefing',
+  ] as const;
+
+  const filteredRequests = useMemo(() => {
+    if (requestCategoryFilter === 'Todos') {
+      return requests;
+    }
+    return requests.filter(
+      (req) => (req.category || '').trim().toLowerCase() === requestCategoryFilter.toLowerCase()
+    );
+  }, [requests, requestCategoryFilter]);
+
+  // Fechamento de modal por tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedRequestDetails) {
+          setSelectedRequestDetails(null);
+        } else if (isNewRequestModalOpen && !isSubmittingRequest) {
+          setIsNewRequestModalOpen(false);
+          setRequestError(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRequestDetails, isNewRequestModalOpen, isSubmittingRequest]);
 
   // Captura eventual parâmetro de token na URL ao montar
   useEffect(() => {
@@ -484,30 +524,77 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
                 </button>
               </div>
 
-              {requests.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  Nenhuma solicitação aberta registrada no momento.
+              {/* Filtros de Categoria (7 filtros rigorosamente preservados) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none overscroll-x-contain touch-pan-x">
+                {REQUEST_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setRequestCategoryFilter(cat)}
+                    className={`min-h-[28px] px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 ${
+                      requestCategoryFilter === cat
+                        ? 'bg-cyan-500 text-slate-950 font-bold'
+                        : 'bg-slate-950/70 border border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {filteredRequests.length === 0 ? (
+                <p className="text-xs text-slate-500 py-2">
+                  {requestCategoryFilter === 'Todos'
+                    ? 'Nenhuma solicitação aberta registrada no momento.'
+                    : `Nenhuma solicitação na categoria "${requestCategoryFilter}".`}
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {requests.map((req) => (
+                <div className="space-y-2.5">
+                  {filteredRequests.map((req) => (
                     <div
                       key={req.id}
-                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs space-y-2"
+                      onClick={() => setSelectedRequestDetails(req)}
+                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-950/90 transition-all text-xs space-y-2 cursor-pointer group select-none"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedRequestDetails(req);
+                        }
+                      }}
+                      title="Clique para ver a mensagem completa"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-200">{req.title}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-cyan-300">
-                          {req.status}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors truncate">
+                          {req.title}
                         </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {req.category && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/40">
+                              {req.category}
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-cyan-300">
+                            {req.status}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-slate-400 line-clamp-3 leading-relaxed">
+                      <p className="text-slate-400 line-clamp-2 leading-relaxed">
                         {req.description}
                       </p>
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500 border-t border-slate-900/80">
+                        <span>
+                          {req.created_at ? new Date(req.created_at).toLocaleDateString('pt-BR') : ''}
+                        </span>
+                        <span className="text-cyan-400 group-hover:underline inline-flex items-center gap-0.5 font-medium">
+                          Ver detalhes &rarr;
+                        </span>
+                      </div>
                       {req.admin_reply && (
-                        <div className="mt-2 pt-2 border-t border-slate-800/60 text-slate-300 bg-cyan-950/20 p-2 rounded-lg">
-                          <span className="font-semibold text-cyan-400 block mb-0.5">Resposta NexaWeb:</span>
-                          <span>{req.admin_reply}</span>
+                        <div className="mt-1 pt-1.5 border-t border-slate-800/60 text-slate-300 bg-cyan-950/20 p-2 rounded-lg">
+                          <span className="font-semibold text-cyan-400 block mb-0.5 text-[10px] uppercase tracking-wider">Resposta NexaWeb:</span>
+                          <p className="line-clamp-2 text-slate-300">{req.admin_reply}</p>
                         </div>
                       )}
                     </div>

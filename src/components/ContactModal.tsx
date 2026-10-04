@@ -35,7 +35,9 @@ import {
   ShieldCheck,
   Instagram,
   Copy,
+  Loader2,
 } from 'lucide-react';
+import { navigateTo } from '../router';
 import type { ProjectItem } from '../data/projects';
 import { PLANS_DATA, type PlanId } from './PlanDetailModal';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -253,6 +255,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   // Hook 2c: copiedSummary
   const [copiedSummary, setCopiedSummary] = useState(false);
+
+  // Hook 2d: portalAccessToken & isNavigatingPortal (Acesso direto à Área do Cliente)
+  const [portalAccessToken, setPortalAccessToken] = useState<string | null>(null);
+  const [isNavigatingPortal, setIsNavigatingPortal] = useState(false);
 
   // Hook 3: stage (presentation -> briefing -> contact -> review)
   const [stage, setStage] = useState<BriefingStage>(initialStage || 'presentation');
@@ -843,6 +849,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         if (supabaseData?.projectId) {
           createdProjectId = supabaseData.projectId;
         }
+        if (supabaseData?.accessToken) {
+          setPortalAccessToken(supabaseData.accessToken);
+        }
       } else {
         const errorData = await supabaseResponse.json().catch(() => null);
         console.warn(
@@ -1023,6 +1032,34 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setSubmitted(true);
   };
 
+  const handleAccessPortal = async () => {
+    if (isNavigatingPortal) return;
+    setIsNavigatingPortal(true);
+    try {
+      if (portalAccessToken) {
+        // Autentica via API para criar a sessão segura (cookie HTTP-only HMAC)
+        await fetch('/api/portal-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ token: portalAccessToken }),
+        });
+      }
+    } catch (err) {
+      console.warn('Auto-auth portal notice:', err);
+    } finally {
+      setIsNavigatingPortal(false);
+      onClose();
+      if (portalAccessToken) {
+        navigateTo(`/portal?token=${encodeURIComponent(portalAccessToken)}`);
+      } else {
+        navigateTo('/portal');
+      }
+    }
+  };
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // GUARD: Only returns null right before JSX, after all hooks
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1171,7 +1208,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <CheckCircle2 className={`w-8 h-8 ${theme.text}`} />
               </div>
 
-              <div className="space-y-2 max-w-md mx-auto">
+              <div className="space-y-3 max-w-md mx-auto">
                 <h4 className="text-xl sm:text-2xl font-bold font-display text-white">
                   Briefing Recebido com Sucesso!
                 </h4>
@@ -1180,14 +1217,46 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   <strong className={theme.text}>Plano {activePlan}</strong>. Nossa equipe
                   analisará os detalhes e entrará em contato em breve.
                 </p>
+
+                {/* Acompanhamento do Desenvolvimento pela Área do Cliente */}
+                <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-neutral-800 text-left space-y-1.5 mt-2">
+                  <div className="flex items-center gap-2 text-cyan-400">
+                    <Layers className="w-4 h-4 shrink-0" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Acompanhamento do Projeto</span>
+                  </div>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    Você poderá acompanhar o desenvolvimento do seu site pela Área do Cliente, incluindo etapas, atualizações, solicitações e o andamento do projeto.
+                  </p>
+                </div>
+
                 <p className="text-xs text-neutral-400">
                   {hasOfficialWhatsApp()
-                    ? 'Para agilizar ainda mais o início do seu site, clique abaixo e envie os detalhes diretamente pelo WhatsApp:'
+                    ? 'Para agilizar ainda mais o início do seu site, você também pode enviar os detalhes diretamente pelo WhatsApp:'
                     : 'Acompanhe as atualizações da NexaWeb pelo Instagram oficial ou copie o resumo abaixo para seus registros:'}
                 </p>
               </div>
 
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto flex-wrap">
+                {/* Botão Principal: Acessar Área do Cliente */}
+                <button
+                  type="button"
+                  onClick={handleAccessPortal}
+                  disabled={isNavigatingPortal}
+                  className="w-full sm:w-auto min-h-[46px] px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-neutral-950 font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 active:scale-[0.98] transition-all"
+                >
+                  {isNavigatingPortal ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Acessando Área do Cliente...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="w-4 h-4" />
+                      <span>Acessar Área do Cliente</span>
+                    </>
+                  )}
+                </button>
+
                 {hasOfficialWhatsApp() ? (
                   <a
                     href={getOfficialWhatsAppUrl(rawBriefingSummary) || '#'}
@@ -1196,7 +1265,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     className="w-full sm:w-auto min-h-[46px] px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    <span>Enviar pelo WhatsApp Agora</span>
+                    <span>Enviar pelo WhatsApp</span>
                   </a>
                 ) : (
                   <a

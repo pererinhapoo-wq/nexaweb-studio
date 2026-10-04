@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabaseUrl =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -108,11 +109,50 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    // Gera token de acesso criptográfico de alta entropia para a Área do Cliente
+    let accessToken: string | null = null;
+    try {
+      const rawToken = 'nwx_' + crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      const { data: newAccess, error: accessError } = await supabase
+        .from('client_access')
+        .insert({
+          project_id: project.id,
+          token_hash: tokenHash,
+          is_active: true,
+          access_count: 0,
+        })
+        .select('id')
+        .single();
+
+      if (!accessError && newAccess) {
+        accessToken = rawToken;
+
+        // Auditoria opcional em project_history (não fatal)
+        try {
+          await supabase.from('project_history').insert({
+            project_id: project.id,
+            action: 'ACCESS_GENERATED',
+            details: {
+              access_id: newAccess.id,
+              origin: 'BRIEFING_SUBMISSION',
+            },
+          });
+        } catch {
+          // ignora erro de auditoria
+        }
+      }
+    } catch (tokenErr) {
+      console.error('Erro ao gerar client_access inicial:', tokenErr);
+    }
+
     return res.status(200).json({
       success: true,
       clientId: client.id,
       projectId: project.id,
       requestId: request.id,
+      accessToken,
     });
   } catch (error) {
     console.error('Erro ao salvar briefing:', error);
