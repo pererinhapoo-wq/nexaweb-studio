@@ -177,6 +177,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Estados de Modais & Seleção
   const [selectedBriefing, setSelectedBriefing] = useState<AdminBriefingItem | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<AdminClientRequestItem | null>(null);
   const [isNewBriefingModalOpen, setIsNewBriefingModalOpen] = useState<boolean>(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState<boolean>(false);
   const [editingDemo, setEditingDemo] = useState<ProjectItem | null>(null);
@@ -358,6 +359,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       window.removeEventListener('nexaweb:overrides-updated', handleStorage);
     };
   }, []);
+
+  // Fechamento da modal de detalhes de solicitação por tecla Escape
+  useEffect(() => {
+    if (!selectedRequest) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedRequest(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRequest]);
 
   // Persistir Briefings
   const persistBriefings = (updated: AdminBriefingItem[]) => {
@@ -1550,12 +1563,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 filteredClientRequests.map((item) => (
                   <div
                     key={item.id}
-                    className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 transition-all space-y-3"
+                    onClick={() => setSelectedRequest(item)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedRequest(item);
+                      }
+                    }}
+                    className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-cyan-500/50 hover:bg-neutral-900 transition-all space-y-3 cursor-pointer group select-none"
+                    title="Clique para ver a mensagem completa da solicitação"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/60 pb-3">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-white text-sm">{item.projectName}</span>
+                          <span className="font-bold text-white text-sm group-hover:text-cyan-300 transition-colors">
+                            {item.projectName}
+                          </span>
                           <span className="text-neutral-600 text-xs">•</span>
                           <span className="text-xs text-neutral-400 font-medium">
                             {item.clientName}
@@ -1573,7 +1598,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
                           {item.category}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-800 text-neutral-300">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-800 text-neutral-300">
                           Prioridade: {item.priority}
                         </span>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60">
@@ -1586,12 +1611,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
 
                     <div className="space-y-1 text-xs">
-                      <h4 className="text-sm font-semibold text-neutral-200">
+                      <h4 className="text-sm font-semibold text-neutral-200 group-hover:text-white transition-colors">
                         {item.title}
                       </h4>
-                      <p className="text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-xs text-neutral-300 line-clamp-2 leading-relaxed">
                         {item.description}
                       </p>
+                      <div className="pt-1 flex items-center justify-between text-[11px] text-neutral-500 border-t border-neutral-900/80">
+                        <span>Clique para expandir mensagem e resposta</span>
+                        <span className="text-cyan-400 font-medium group-hover:underline inline-flex items-center gap-1">
+                          Ver detalhes completos &rarr;
+                        </span>
+                      </div>
                     </div>
 
                     {item.adminReply && (
@@ -1599,7 +1630,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span className="font-semibold text-cyan-400 block text-[11px]">
                           Resposta NexaWeb ({item.repliedAt ? new Date(item.repliedAt).toLocaleString('pt-BR') : 'Enviada'}):
                         </span>
-                        <p className="leading-relaxed">{item.adminReply}</p>
+                        <p className="line-clamp-2 leading-relaxed text-slate-300">{item.adminReply}</p>
                       </div>
                     )}
                   </div>
@@ -3447,6 +3478,187 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODAL: VISUALIZAR SOLICITAÇÃO COMPLETA DO CLIENTE (ADMIN)
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {selectedRequest && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-request-details-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedRequest(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] max-h-[85dvh] flex flex-col bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-neutral-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho Fixo do Modal */}
+            <div className="shrink-0 px-5 py-4 border-b border-neutral-800 bg-neutral-950/90 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shrink-0">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                      Solicitação do Cliente
+                    </span>
+                    <span className="text-neutral-600 text-[10px]">•</span>
+                    <span className="text-xs text-neutral-400 font-medium truncate max-w-[220px]">
+                      {selectedRequest.projectName}
+                    </span>
+                  </div>
+                  <h3
+                    id="admin-request-details-title"
+                    className="text-sm sm:text-base font-bold text-white truncate mt-0.5"
+                  >
+                    {selectedRequest.title}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRequest(null)}
+                className="min-h-[38px] min-w-[38px] rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                aria-label="Fechar detalhes da solicitação"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Corpo Rolável com rolagem interna suave e confortável para textos longos */}
+            <div
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4 text-xs"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {/* Informações de Projeto & Cliente */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-0.5">
+                  <span className="text-neutral-500 block text-[10px] uppercase font-bold tracking-wider">
+                    Projeto / Empresa
+                  </span>
+                  <span className="font-semibold text-white text-xs block break-words">
+                    {selectedRequest.projectName}
+                    {selectedRequest.clientBusinessName ? ` (${selectedRequest.clientBusinessName})` : ''}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-0.5">
+                  <span className="text-neutral-500 block text-[10px] uppercase font-bold tracking-wider">
+                    Cliente / Responsável
+                  </span>
+                  <span className="font-semibold text-neutral-200 text-xs block break-words">
+                    {selectedRequest.clientName}
+                  </span>
+                  {selectedRequest.clientEmail && (
+                    <span className="text-[11px] text-neutral-400 font-mono block break-all">
+                      {selectedRequest.clientEmail}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Badges de Metadados: Categoria, Status, Prioridade e Data/Horário */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                    Categoria
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 inline-block truncate max-w-full">
+                    {selectedRequest.category}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                    Status
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60 inline-block truncate max-w-full">
+                    {selectedRequest.status}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                    Prioridade
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-800 text-neutral-300 inline-block truncate max-w-full">
+                    {selectedRequest.priority}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                    Data e Horário
+                  </span>
+                  <span className="text-[11px] font-medium text-neutral-300 block truncate">
+                    {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleString('pt-BR') : 'Data não disponível'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Título Completo */}
+              <div className="space-y-1 pt-1 border-t border-neutral-800/80">
+                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                  Título Completo
+                </span>
+                <p className="text-sm font-bold text-white break-words leading-snug">
+                  {selectedRequest.title}
+                </p>
+              </div>
+
+              {/* Mensagem / Descrição COMPLETA (SEM line-clamp, preservando quebras de linha e sem corte) */}
+              <div className="space-y-1.5 pt-1 border-t border-neutral-800/80">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
+                    Mensagem Completa do Cliente
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-mono">
+                    {selectedRequest.description.length} caracteres
+                  </span>
+                </div>
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs sm:text-sm whitespace-pre-wrap break-words leading-relaxed select-text font-normal">
+                  {selectedRequest.description}
+                </div>
+              </div>
+
+              {/* Resposta do Administrador (quando disponível) */}
+              {selectedRequest.adminReply && (
+                <div className="space-y-2 pt-1 border-t border-neutral-800/80">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider inline-flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Resposta Enviada ao Cliente</span>
+                    </span>
+                    {selectedRequest.repliedAt && (
+                      <span className="text-[11px] text-neutral-400 font-mono">
+                        {new Date(selectedRequest.repliedAt).toLocaleString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4 rounded-xl bg-cyan-950/20 border border-cyan-800/40 text-neutral-200 text-xs sm:text-sm whitespace-pre-wrap break-words leading-relaxed select-text">
+                    {selectedRequest.adminReply}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé Fixo do Modal */}
+            <div className="shrink-0 px-5 py-3.5 border-t border-neutral-800 bg-neutral-950/90 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedRequest(null)}
+                className="min-h-[40px] px-5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-white transition-colors cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

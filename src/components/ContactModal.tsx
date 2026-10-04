@@ -1232,7 +1232,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <span className="text-xs font-bold uppercase tracking-wider">Acompanhamento do Projeto</span>
                   </div>
                   <p className="text-xs text-neutral-300 leading-relaxed">
-                    Você poderá acompanhar o desenvolvimento do seu site pela Área do Cliente, incluindo etapas, atualizações, solicitações e o andamento do projeto.
+                    Você pode acessar a <strong>Área do Cliente</strong> imediatamente pelo botão abaixo ou posteriormente a qualquer momento pelo menu do site para acompanhar as etapas, atualizações e solicitações do seu projeto.
                   </p>
                 </div>
 

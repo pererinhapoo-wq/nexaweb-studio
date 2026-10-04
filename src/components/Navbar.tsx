@@ -186,7 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <a
               href="/portal"
-              className="hover:text-neutral-100 transition-colors"
+              className="text-neutral-400 hover:text-white transition-colors"
             >
               Área do Cliente
             </a>
@@ -396,7 +396,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onClick={() => setMobileMenuOpen(false)}
                     className="min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors text-xs font-semibold"
                   >
-                    <span>🔐 Área do Cliente</span>
+                    <span>Área do Cliente</span>
                   </a>
                 </nav>
               </div>
