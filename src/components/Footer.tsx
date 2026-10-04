@@ -161,7 +161,16 @@ export const Footer: React.FC = () => {
 
         {/* Bottom copyright */}
         <div className="pt-8 mt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
-          <p>© {new Date().getFullYear()} NexaWeb. Todos os direitos reservados.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p>© {new Date().getFullYear()} NexaWeb. Todos os direitos reservados.</p>
+            <span>·</span>
+            <a
+              href="/portal"
+              className="text-neutral-500 hover:text-neutral-300 transition-colors"
+            >
+              Área do Cliente
+            </a>
+          </div>
           <div className="flex items-center gap-2 text-emerald-400/80">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Plataformas Seguras & Otimizadas</span>

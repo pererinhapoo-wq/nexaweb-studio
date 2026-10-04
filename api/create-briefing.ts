@@ -59,7 +59,6 @@ export default async function handler(req: any, res: any) {
         details: clientError.details,
         hint: clientError.hint,
       });
-
       console.error('Erro ao criar cliente:', clientError);
 
       return res.status(500).json({

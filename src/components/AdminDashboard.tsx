@@ -34,6 +34,9 @@ import {
   Shield,
   Laptop,
   AlertCircle,
+  Key,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   ALL_PROJECTS,
@@ -92,6 +95,10 @@ export interface AdminProjectItem {
   url?: string;
   notes?: string;
   date: string;
+  stagingUrl?: string;
+  progressPercent?: number;
+  currentStage?: string;
+  headlineMessage?: string;
 }
 
 interface AdminDashboardProps {
@@ -148,6 +155,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingDemo, setEditingDemo] = useState<ProjectItem | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Estados do Gerenciamento da Área do Cliente
+  const [portalProject, setPortalProject] = useState<AdminProjectItem | null>(null);
+  const [portalCustomId, setPortalCustomId] = useState<string>('');
+  const [portalAccessStatus, setPortalAccessStatus] = useState<any>(null);
+  const [isLoadingAccessStatus, setIsLoadingAccessStatus] = useState<boolean>(false);
+  const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [generatedRawToken, setGeneratedRawToken] = useState<string | null>(null);
+  const [portalProgress, setPortalProgress] = useState<number>(0);
+  const [portalStage, setPortalStage] = useState<string>('Briefing');
+  const [portalHeadline, setPortalHeadline] = useState<string>('');
+  const [portalStagingUrl, setPortalStagingUrl] = useState<string>('');
+  const [portalProductionUrl, setPortalProductionUrl] = useState<string>('');
+  const [portalStatus, setPortalStatus] = useState<string>('Planejamento');
+  const [isSavingProject, setIsSavingProject] = useState<boolean>(false);
+  const [copiedToken, setCopiedToken] = useState<boolean>(false);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+
+  const PORTAL_STAGES = [
+    'Briefing',
+    'Análise',
+    'Planejamento',
+    'Desenvolvimento',
+    'Revisão',
+    'Publicação',
+    'Entrega',
+  ];
 
   // Filtros e Pesquisas
   const [briefingFilter, setBriefingFilter] = useState<string>('todos');
@@ -343,6 +378,171 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       url: '',
       notes: '',
     });
+  };
+
+  // Funções da Área do Cliente (Portal)
+  const fetchAccessStatus = async (projectId: string) => {
+    if (!projectId?.trim()) return;
+    setIsLoadingAccessStatus(true);
+    try {
+      const res = await fetch('/api/admin-client-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ projectId: projectId.trim(), action: 'status' }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        setPortalAccessStatus(data.status);
+      } else {
+        setPortalAccessStatus(null);
+      }
+    } catch (err) {
+      console.error('Erro ao consultar status de acesso:', err);
+      setPortalAccessStatus(null);
+    } finally {
+      setIsLoadingAccessStatus(false);
+    }
+  };
+
+  const handleOpenPortalModal = (project: AdminProjectItem) => {
+    setPortalProject(project);
+    setPortalCustomId(project.id);
+    setGeneratedRawToken(null);
+    setActionFeedback(null);
+    setCopiedToken(false);
+    setCopiedLink(false);
+
+    setPortalProgress(project.progressPercent ?? 0);
+    setPortalStage(project.currentStage || 'Briefing');
+    setPortalHeadline(project.headlineMessage || '');
+    setPortalStagingUrl(project.stagingUrl || '');
+    setPortalProductionUrl(project.url || '');
+    setPortalStatus(project.status);
+
+    fetchAccessStatus(project.id);
+  };
+
+  const handleClosePortalModal = () => {
+    setPortalProject(null);
+    setGeneratedRawToken(null); // Limpa da memória imediatamente
+    setPortalAccessStatus(null);
+    setActionFeedback(null);
+  };
+
+  const handleAccessAction = async (action: 'generate' | 'regenerate' | 'revoke') => {
+    if (!portalCustomId.trim()) {
+      setActionFeedback({ type: 'error', message: 'ID do projeto é obrigatório.' });
+      return;
+    }
+
+    if (action === 'revoke' && !window.confirm('Tem certeza de que deseja revogar o acesso do cliente a este projeto?')) {
+      return;
+    }
+
+    setIsActionLoading(true);
+    setActionFeedback(null);
+    try {
+      const res = await fetch('/api/admin-client-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ projectId: portalCustomId.trim(), action }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        if (action === 'revoke') {
+          setGeneratedRawToken(null);
+          setActionFeedback({ type: 'success', message: 'Acesso revogado com sucesso.' });
+        } else {
+          setGeneratedRawToken(data.token);
+          setActionFeedback({
+            type: 'success',
+            message: action === 'generate' ? 'Nova chave de acesso gerada com sucesso!' : 'Acesso regenerado! A chave anterior foi invalidada.',
+          });
+        }
+        await fetchAccessStatus(portalCustomId.trim());
+      } else {
+        setActionFeedback({ type: 'error', message: data?.error || 'Erro ao processar ação de acesso.' });
+      }
+    } catch {
+      setActionFeedback({ type: 'error', message: 'Erro na conexão com o servidor.' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleSaveProjectManage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!portalCustomId.trim()) {
+      setActionFeedback({ type: 'error', message: 'ID do projeto é obrigatório.' });
+      return;
+    }
+
+    setIsSavingProject(true);
+    setActionFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin-project-manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          projectId: portalCustomId.trim(),
+          progressPercent: Number(portalProgress),
+          currentStage: portalStage,
+          headlineMessage: portalHeadline,
+          stagingUrl: portalStagingUrl.trim() || null,
+          productionUrl: portalProductionUrl.trim() || null,
+          status: portalStatus,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        setActionFeedback({ type: 'success', message: 'Dados do projeto atualizados com sucesso no portal!' });
+
+        if (portalProject) {
+          const updated = projects.map((p) =>
+            p.id === portalProject.id
+              ? {
+                  ...p,
+                  status: portalStatus as ProjectStatus,
+                  url: portalProductionUrl.trim() || undefined,
+                  stagingUrl: portalStagingUrl.trim() || undefined,
+                  progressPercent: Number(portalProgress),
+                  currentStage: portalStage,
+                  headlineMessage: portalHeadline,
+                }
+              : p
+          );
+          persistProjects(updated);
+        }
+      } else {
+        setActionFeedback({ type: 'error', message: data?.error || 'Erro ao salvar alterações no projeto.' });
+      }
+    } catch {
+      setActionFeedback({ type: 'error', message: 'Falha na conexão ao salvar projeto.' });
+    } finally {
+      setIsSavingProject(false);
+    }
+  };
+
+  const handleCopyToken = () => {
+    if (!generatedRawToken) return;
+    navigator.clipboard.writeText(generatedRawToken);
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 2500);
+  };
+
+  const handleCopyLink = () => {
+    if (!generatedRawToken) return;
+    const fullLink = `${window.location.origin}/portal?token=${encodeURIComponent(generatedRawToken)}`;
+    navigator.clipboard.writeText(fullLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   };
 
   // Ações de Demos & Imagens
@@ -1187,13 +1387,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       )}
                       <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-xs text-neutral-500">
                         <span>Data: {p.date}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteProject(p.id)}
-                          className="text-red-400 hover:text-red-300 text-xs font-semibold"
-                        >
-                          Excluir
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPortalModal(p)}
+                            className="px-2.5 py-1 rounded-lg bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-400 hover:text-cyan-300 border border-cyan-800/80 text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <Key className="w-3 h-3" />
+                            <span>Área do Cliente</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProject(p.id)}
+                            className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                          >
+                            Excluir
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1258,15 +1468,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </td>
                             <td className="p-3.5 text-neutral-500">{p.date}</td>
                             <td className="p-3.5 pr-5 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteProject(p.id)}
-                                className="h-8 w-8 rounded-lg bg-neutral-950 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-neutral-800 inline-flex items-center justify-center transition-colors"
-                                title="Remover projeto"
-                                aria-label="Remover projeto"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPortalModal(p)}
+                                  className="h-8 px-2.5 rounded-lg bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 hover:text-cyan-200 border border-cyan-800/70 inline-flex items-center gap-1.5 transition-colors font-medium text-[11px]"
+                                  title="Gerenciar Área do Cliente"
+                                >
+                                  <Key className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>Área do Cliente</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProject(p.id)}
+                                  className="h-8 w-8 rounded-lg bg-neutral-950 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-neutral-800 inline-flex items-center justify-center transition-colors"
+                                  title="Remover projeto"
+                                  aria-label="Remover projeto"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -2115,8 +2336,362 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          MODAL: EDITAR DEMONSTRAÇÃO / GERENCIADOR DE IMAGENS
+          MODAL: GERENCIAMENTO DA ÁREA DO CLIENTE
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {portalProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl text-neutral-200 max-h-[92vh] overflow-y-auto">
+            {/* Cabeçalho */}
+            <div className="flex items-start justify-between border-b border-neutral-800 pb-4">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-1">
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Área do Cliente & Acompanhamento</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold font-display text-white">
+                  {portalProject.projectName}
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Cliente: <span className="text-white font-medium">{portalProject.clientName}</span> · Plano {portalProject.plan}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClosePortalModal}
+                className="min-h-[38px] min-w-[38px] rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
+                aria-label="Fechar gerenciamento da área do cliente"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Feedback de Ação */}
+            {actionFeedback && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  actionFeedback.type === 'success'
+                    ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'
+                    : 'bg-red-950/40 border-red-800/60 text-red-200'
+                }`}
+              >
+                {actionFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                )}
+                <span>{actionFeedback.message}</span>
+              </div>
+            )}
+
+            {/* SEÇÃO 1: SEGURANÇA E CHAVE DE ACESSO */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Controle de Acesso do Cliente
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-400">ID no Banco:</span>
+                  <input
+                    type="text"
+                    value={portalCustomId}
+                    onChange={(e) => setPortalCustomId(e.target.value)}
+                    placeholder="UUID ou ID do projeto..."
+                    className="h-8 px-2.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-white font-mono placeholder:text-neutral-600 focus:border-cyan-400 outline-none w-48"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fetchAccessStatus(portalCustomId)}
+                    disabled={isLoadingAccessStatus}
+                    className="h-8 w-8 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 flex items-center justify-center transition-colors"
+                    title="Recarregar status de acesso"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAccessStatus ? 'animate-spin text-cyan-400' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status do Token */}
+              <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800/80 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-neutral-400 mb-1">Status da Credencial:</div>
+                  <div className="flex items-center gap-2">
+                    {isLoadingAccessStatus ? (
+                      <span className="text-neutral-400">Consultando...</span>
+                    ) : portalAccessStatus?.active ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-[11px] font-bold">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Chave Ativa
+                      </span>
+                    ) : portalAccessStatus?.exists ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 text-[11px] font-bold">
+                        Acesso Revogado / Expirado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-800 text-neutral-400 text-[11px] font-bold">
+                        Nenhuma Chave Gerada
+                      </span>
+                    )}
+
+                    {portalAccessStatus?.last_used_at && (
+                      <span className="text-[11px] text-neutral-500">
+                        · Último login: {new Date(portalAccessStatus.last_used_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Botões de Ação do Acesso */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {!portalAccessStatus?.active ? (
+                    <button
+                      type="button"
+                      disabled={isActionLoading}
+                      onClick={() => handleAccessAction('generate')}
+                      className="min-h-[34px] px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 transition-all disabled:opacity-50"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>Gerar Acesso</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isActionLoading}
+                        onClick={() => handleAccessAction('regenerate')}
+                        className="min-h-[34px] px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 transition-all disabled:opacity-50"
+                        title="Invalida a chave atual e cria uma nova"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Regenerar Acesso</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isActionLoading}
+                        onClick={() => handleAccessAction('revoke')}
+                        className="min-h-[34px] px-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/80 font-bold text-xs inline-flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Revogar Acesso</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Chave Recém-Gerada (Exibição Única e Temporária na Memória) */}
+              {generatedRawToken && (
+                <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-950/50 to-neutral-950 border border-cyan-500/40 text-xs space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      Chave de Acesso Exclusiva Gerada!
+                    </span>
+                    <span className="text-[10px] text-cyan-400/80 uppercase font-mono">
+                      Exibição Temporária
+                    </span>
+                  </div>
+                  <p className="text-neutral-300 text-[11px] leading-relaxed">
+                    Copie a chave ou o link completo abaixo para enviar ao cliente. Por segurança, o token bruto não é salvo em texto puro e não será exibido após fechar esta janela.
+                  </p>
+
+                  {/* Token Box */}
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-semibold text-neutral-400 uppercase">Token Bruto:</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={generatedRawToken}
+                        className="w-full h-9 px-3 rounded-lg bg-neutral-900 border border-cyan-800/60 text-cyan-300 font-mono text-xs select-all outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyToken}
+                        className="h-9 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                      >
+                        {copiedToken ? <Check className="w-3.5 h-3.5 text-neutral-950" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedToken ? 'Copiado!' : 'Copiar Token'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Link Completo Box */}
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-semibold text-neutral-400 uppercase">Link Direto para o Cliente:</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={typeof window !== 'undefined' ? `${window.location.origin}/portal?token=${generatedRawToken}` : ''}
+                        className="w-full h-9 px-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-200 font-mono text-xs select-all outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="h-9 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                      >
+                        {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                        <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* SEÇÃO 2: DADOS DO PROJETO NO PORTAL (ETAPA, PROGRESSO, RECADO, LINKS) */}
+            <form onSubmit={handleSaveProjectManage} className="space-y-4 text-xs">
+              <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider pt-2">
+                <Layers className="w-4 h-4 text-amber-400" />
+                <span>Atualização de Progresso & Homologação</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Etapa Atual */}
+                <div className="space-y-1.5">
+                  <label className="text-neutral-400 font-medium">Etapa Atual do Projeto *</label>
+                  <select
+                    value={portalStage}
+                    onChange={(e) => setPortalStage(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white outline-none focus:border-cyan-400 font-medium"
+                    aria-label="Etapa do projeto"
+                  >
+                    {PORTAL_STAGES.map((stg) => (
+                      <option key={stg} value={stg}>
+                        {stg}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Interno */}
+                <div className="space-y-1.5">
+                  <label className="text-neutral-400 font-medium">Status Operacional</label>
+                  <select
+                    value={portalStatus}
+                    onChange={(e) => setPortalStatus(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white outline-none focus:border-cyan-400 font-medium"
+                    aria-label="Status operacional"
+                  >
+                    <option value="Planejamento">Planejamento</option>
+                    <option value="Em desenvolvimento">Em desenvolvimento</option>
+                    <option value="Em revisão">Em revisão</option>
+                    <option value="Publicado">Publicado</option>
+                    <option value="Entregue">Entregue</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Progresso com Slider e Input Numérico */}
+              <div className="space-y-2 p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-neutral-300 font-semibold">Progresso Geral (% Concluído)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={portalProgress}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                        setPortalProgress(val);
+                      }}
+                      className="w-16 h-8 px-2 rounded-lg bg-neutral-900 border border-neutral-800 text-cyan-300 font-bold text-center text-xs outline-none focus:border-cyan-400"
+                    />
+                    <span className="text-cyan-400 font-bold">%</span>
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={portalProgress}
+                  onChange={(e) => setPortalProgress(Number(e.target.value))}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+
+                <div className="w-full bg-neutral-900 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full transition-all"
+                    style={{ width: `${portalProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Mensagem em Destaque ao Cliente */}
+              <div className="space-y-1.5">
+                <label className="text-neutral-400 font-medium">
+                  Mensagem / Recado em Destaque (Visível no Portal do Cliente)
+                </label>
+                <textarea
+                  rows={2}
+                  value={portalHeadline}
+                  onChange={(e) => setPortalHeadline(e.target.value)}
+                  placeholder="Ex: Layout e estrutura validados. Iniciando configuração de formulários e hospedagem..."
+                  className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-cyan-400 resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* URLs de Homologação e Produção */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-neutral-400 font-medium">URL de Testes (Homologação / Staging)</label>
+                  <input
+                    type="url"
+                    value={portalStagingUrl}
+                    onChange={(e) => setPortalStagingUrl(e.target.value)}
+                    placeholder="https://preview.nexaweb.com.br/cliente"
+                    className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-neutral-400 font-medium">URL de Produção (Site Oficial no Ar)</label>
+                  <input
+                    type="url"
+                    value={portalProductionUrl}
+                    onChange={(e) => setPortalProductionUrl(e.target.value)}
+                    placeholder="https://www.cliente.com.br"
+                    className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder:text-neutral-600 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Botões do Rodapé */}
+              <div className="pt-3 border-t border-neutral-800 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleClosePortalModal}
+                  className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-300 hover:text-white transition-colors"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProject}
+                  className="min-h-[40px] px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-neutral-950 text-xs font-bold transition-all shadow-md shadow-cyan-500/20 disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {isSavingProject ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-neutral-950" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5 text-neutral-950" />
+                      <span>Salvar Alterações no Projeto</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {editingDemo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl text-neutral-200 max-h-[92vh] overflow-y-auto">

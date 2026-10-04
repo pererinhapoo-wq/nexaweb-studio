@@ -5,7 +5,12 @@
  * deep-linking, refresh direto em /admin e compatibilidade entre ambientes.
  */
 
-type RouteListener = (isAdmin: boolean) => void;
+export interface RouteState {
+  isAdmin: boolean;
+  isPortal: boolean;
+}
+
+type RouteListener = (state: RouteState) => void;
 
 const listeners = new Set<RouteListener>();
 
@@ -41,6 +46,38 @@ export function checkIsAdminRoute(): boolean {
   return false;
 }
 
+export function checkIsPortalRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const pathname = window.location.pathname.toLowerCase().trim();
+  const hash = window.location.hash.toLowerCase().trim();
+
+  // Remove barras no final para comparação exata (ex: /portal/ -> /portal)
+  const cleanPath = pathname.replace(/\/+$/, '');
+  const cleanHash = hash.replace(/\/+$/, '');
+
+  // 1. Verificação por caminho real (Pathname)
+  if (
+    cleanPath === '/portal' ||
+    cleanPath === '/portal.html' ||
+    cleanPath.startsWith('/portal/')
+  ) {
+    return true;
+  }
+
+  // 2. Verificação por Hash (#portal ou #/portal)
+  if (
+    cleanHash === '#portal' ||
+    cleanHash === '#/portal' ||
+    cleanHash.startsWith('#portal/') ||
+    cleanHash.startsWith('#/portal/')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Navega para uma nova rota programaticamente na SPA
  */
@@ -61,16 +98,19 @@ export function navigateTo(url: string, replace = false): void {
  */
 export function notifyRouteChanged(): void {
   const isAdmin = checkIsAdminRoute();
+  const isPortal = checkIsPortalRoute();
   listeners.forEach((listener) => {
     try {
-      listener(isAdmin);
+      listener({ isAdmin, isPortal });
     } catch (err) {
       console.error('Erro no listener de rota NexaWeb:', err);
     }
   });
 
   // Dispara eventos padrão para componentes externos
-  window.dispatchEvent(new CustomEvent('nexaweb:route-change', { detail: { isAdmin } }));
+  window.dispatchEvent(
+    new CustomEvent('nexaweb:route-change', { detail: { isAdmin, isPortal } })
+  );
 }
 
 /**

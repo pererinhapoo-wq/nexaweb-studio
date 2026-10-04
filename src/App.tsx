@@ -15,7 +15,7 @@ import {
   ArrowRight,
   ArrowLeft,
 } from 'lucide-react';
-import { checkIsAdminRoute, navigateTo, subscribeToRoute } from './router';
+import { checkIsAdminRoute, checkIsPortalRoute, navigateTo, subscribeToRoute } from './router';
 import {
   ESSENCIAL_PROJECTS,
   PROFISSIONAL_PROJECTS,
@@ -42,6 +42,9 @@ import { AdminLogin } from './components/AdminLogin';
 const AdminDashboard = React.lazy(() =>
   import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 );
+const ClientPortal = React.lazy(() =>
+  import('./components/portal/ClientPortal').then((m) => ({ default: m.ClientPortal }))
+);
 const ContactModal = React.lazy(() =>
   import('./components/ContactModal').then((m) => ({ default: m.ContactModal }))
 );
@@ -62,6 +65,9 @@ export default function App() {
   const [isAdminView, setIsAdminView] = useState<boolean>(() => {
     return checkIsAdminRoute();
   });
+  const [isPortalView, setIsPortalView] = useState<boolean>(() => {
+    return checkIsPortalRoute();
+  });
 
   // Estado de autorização administrativa validado exclusivamente pelo servidor
   const [adminAuthStatus, setAdminAuthStatus] = useState<
@@ -74,10 +80,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeProject, setActiveProject] = useState<ProjectItem | null>(null);
 
-  // Synchronize admin route changes across direct URL, refresh, pushState, popstate & hash
+  // Synchronize route changes across direct URL, refresh, pushState, popstate & hash
   React.useEffect(() => {
-    const unsubscribe = subscribeToRoute((isAdmin) => {
+    const unsubscribe = subscribeToRoute(({ isAdmin, isPortal }) => {
       setIsAdminView(isAdmin);
+      setIsPortalView(isPortal);
     });
     return unsubscribe;
   }, []);
@@ -151,7 +158,20 @@ export default function App() {
         return;
       }
 
-      // 2. Navegação por âncoras internas (#planos, #como-funciona, #projetos-essencial, etc.)
+      // 2. Rota /portal e #portal (Área do Cliente)
+      if (
+        href === '/portal' ||
+        href === '/portal/' ||
+        href === '#portal' ||
+        href.startsWith('/portal?') ||
+        href.startsWith('#portal?')
+      ) {
+        e.preventDefault();
+        navigateTo(href);
+        return;
+      }
+
+      // 3. Navegação por âncoras internas (#planos, #como-funciona, #projetos-essencial, etc.)
       if (href.startsWith('#') && href.length > 1 && !href.startsWith('#admin')) {
         const targetId = href.slice(1);
         e.preventDefault();
@@ -424,6 +444,24 @@ export default function App() {
             navigateTo('/');
           }}
           onLogout={handleAdminLogout}
+        />
+      </React.Suspense>
+    );
+  }
+
+  if (isPortalView) {
+    return (
+      <React.Suspense
+        fallback={
+          <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs">
+            Carregando portal do cliente...
+          </div>
+        }
+      >
+        <ClientPortal
+          onBackToHome={() => {
+            navigateTo('/');
+          }}
         />
       </React.Suspense>
     );
