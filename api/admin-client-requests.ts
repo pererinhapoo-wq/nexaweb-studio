@@ -86,8 +86,11 @@ export default async function handler(req: any, res: any) {
 
     if (requestsError) {
       console.error('Erro ao buscar solicitações no Supabase:', requestsError.message);
+
       return res.status(500).json({
         error: 'Não foi possível carregar as solicitações.',
+        supabaseError: requestsError.message,
+        supabaseCode: requestsError.code,
       });
     }
 
