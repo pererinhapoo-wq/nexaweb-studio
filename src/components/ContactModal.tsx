@@ -1035,10 +1035,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const handleAccessPortal = async () => {
     if (isNavigatingPortal) return;
     setIsNavigatingPortal(true);
+    let authenticated = false;
     try {
       if (portalAccessToken) {
-        // Autentica via API para criar a sessão segura (cookie HTTP-only HMAC)
-        await fetch('/api/portal-auth', {
+        // Valida o token gerado via api/portal-auth para estabelecer
+        // com segurança a sessão HTTP-only HMAC (nexaweb_client_session)
+        const authRes = await fetch('/api/portal-auth', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1046,13 +1048,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           credentials: 'same-origin',
           body: JSON.stringify({ token: portalAccessToken }),
         });
+        if (authRes.ok) {
+          authenticated = true;
+        }
       }
     } catch (err) {
       console.warn('Auto-auth portal notice:', err);
     } finally {
       setIsNavigatingPortal(false);
       onClose();
-      if (portalAccessToken) {
+      if (authenticated) {
+        navigateTo('/portal');
+      } else if (portalAccessToken) {
         navigateTo(`/portal?token=${encodeURIComponent(portalAccessToken)}`);
       } else {
         navigateTo('/portal');

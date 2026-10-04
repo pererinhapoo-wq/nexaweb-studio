@@ -75,6 +75,28 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
     );
   }, [requests, requestCategoryFilter]);
 
+  const formatDateTime = (isoString?: string | null) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return isoString;
+      return (
+        d.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }) +
+        ' às ' +
+        d.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+    } catch {
+      return isoString;
+    }
+  };
+
   // Fechamento de modal por tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -776,6 +798,151 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ onBackToHome }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Detalhes da Solicitação do Cliente */}
+      {selectedRequestDetails && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="request-details-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedRequestDetails(null)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[85vh] max-h-[85dvh] flex flex-col bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho Fixo do Modal */}
+            <div className="shrink-0 px-5 py-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shrink-0">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 block">
+                    Detalhes da Solicitação
+                  </span>
+                  <h3
+                    id="request-details-modal-title"
+                    className="text-sm sm:text-base font-bold text-white truncate"
+                  >
+                    {selectedRequestDetails.title}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRequestDetails(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                aria-label="Fechar detalhes da solicitação"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo Rolável (Leitura Confortável) */}
+            <div
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4 text-xs"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {/* Título Completo */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Título Completo
+                </span>
+                <p className="text-sm font-bold text-white break-words leading-snug">
+                  {selectedRequestDetails.title}
+                </p>
+              </div>
+
+              {/* Badges de Metadados: Categoria, Status, Prioridade e Data/Hora */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {/* Categoria */}
+                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Categoria
+                  </span>
+                  <span className="font-semibold text-cyan-300 text-xs block truncate">
+                    {selectedRequestDetails.category || 'Geral'}
+                  </span>
+                </div>
+
+                {/* Status */}
+                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Status
+                  </span>
+                  <span className="font-semibold text-white text-xs block truncate">
+                    {selectedRequestDetails.status}
+                  </span>
+                </div>
+
+                {/* Prioridade */}
+                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Prioridade
+                  </span>
+                  <span className="font-semibold text-amber-300 text-xs block truncate">
+                    {selectedRequestDetails.priority || 'Normal'}
+                  </span>
+                </div>
+
+                {/* Data e Hora */}
+                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Data e Hora
+                  </span>
+                  <span className="font-medium text-slate-300 text-[11px] block truncate">
+                    {formatDateTime(selectedRequestDetails.created_at)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Mensagem / Descrição Completa (Sem line-clamp, preservando quebras de linha naturais) */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Mensagem Completa da Solicitação
+                </span>
+                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-200 text-xs sm:text-sm whitespace-pre-wrap break-words leading-relaxed select-text">
+                  {selectedRequestDetails.description}
+                </div>
+              </div>
+
+              {/* Resposta da Equipe NexaWeb (quando existir) */}
+              {selectedRequestDetails.admin_reply && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider inline-flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Resposta da Equipe NexaWeb</span>
+                    </span>
+                    {selectedRequestDetails.replied_at && (
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {formatDateTime(selectedRequestDetails.replied_at)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-cyan-950/20 border border-cyan-800/40 text-slate-200 text-xs sm:text-sm whitespace-pre-wrap break-words leading-relaxed select-text">
+                    {selectedRequestDetails.admin_reply}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé Fixo do Modal */}
+            <div className="shrink-0 px-5 py-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedRequestDetails(null)}
+                className="py-2 px-4 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-colors cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

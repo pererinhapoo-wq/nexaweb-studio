@@ -109,7 +109,7 @@ export const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({
             Área do Cliente <span className="text-cyan-400">NexaWeb</span>
           </h1>
           <p className="text-slate-400 text-sm mt-2">
-            Acompanhe em tempo real o status, etapas e revisões do seu projeto.
+            Acompanhe o status, etapas, solicitações e o andamento do seu projeto.
           </p>
         </div>
 

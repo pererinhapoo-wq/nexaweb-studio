@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { hashToken } from './_portal-session.ts';
 
 const supabaseUrl =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -110,37 +111,48 @@ export default async function handler(req: any, res: any) {
     }
 
     // Gera token de acesso criptográfico de alta entropia para a Área do Cliente
+    // caso ainda não exista acesso ativo para este projeto
     let accessToken: string | null = null;
     try {
-      const rawToken = 'nwx_' + crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-      const { data: newAccess, error: accessError } = await supabase
+      const { data: existingAccess } = await supabase
         .from('client_access')
-        .insert({
-          project_id: project.id,
-          token_hash: tokenHash,
-          is_active: true,
-          access_count: 0,
-        })
         .select('id')
-        .single();
+        .eq('project_id', project.id)
+        .eq('is_active', true)
+        .is('revoked_at', null)
+        .maybeSingle();
 
-      if (!accessError && newAccess) {
-        accessToken = rawToken;
+      if (!existingAccess) {
+        const rawToken = 'nwx_' + crypto.randomBytes(32).toString('hex');
+        const tokenHash = hashToken(rawToken);
 
-        // Auditoria opcional em project_history (não fatal)
-        try {
-          await supabase.from('project_history').insert({
+        const { data: newAccess, error: accessError } = await supabase
+          .from('client_access')
+          .insert({
             project_id: project.id,
-            action: 'ACCESS_GENERATED',
-            details: {
-              access_id: newAccess.id,
-              origin: 'BRIEFING_SUBMISSION',
-            },
-          });
-        } catch {
-          // ignora erro de auditoria
+            token_hash: tokenHash,
+            is_active: true,
+            access_count: 0,
+          })
+          .select('id')
+          .single();
+
+        if (!accessError && newAccess) {
+          accessToken = rawToken;
+
+          // Auditoria opcional em project_history (não fatal)
+          try {
+            await supabase.from('project_history').insert({
+              project_id: project.id,
+              action: 'ACCESS_GENERATED',
+              details: {
+                access_id: newAccess.id,
+                origin: 'BRIEFING_SUBMISSION',
+              },
+            });
+          } catch {
+            // ignora erro de auditoria
+          }
         }
       }
     } catch (tokenErr) {
