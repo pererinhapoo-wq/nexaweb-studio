@@ -25,6 +25,7 @@ import {
   Plus,
   Trash2,
   MessageCircle,
+  MessageSquare,
   Settings,
   Rocket,
   Image as ImageIcon,
@@ -79,6 +80,24 @@ export interface AdminBriefingItem {
   filesCount: number;
 }
 
+export interface AdminClientRequestItem {
+  id: string;
+  projectId: string | null;
+  projectName: string;
+  clientName: string;
+  clientBusinessName: string | null;
+  clientEmail: string | null;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  adminReply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ProjectStatus =
   | 'Novo'
   | 'Planejamento'
@@ -115,6 +134,7 @@ interface AdminDashboardProps {
 export type AdminTab =
   | 'dashboard'
   | 'briefings'
+  | 'requests'
   | 'clients'
   | 'projects'
   | 'demos'
@@ -281,6 +301,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Carregar projetos reais do Supabase via /api/admin-projects
   const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(false);
 
+  // Solicitações reais dos clientes via /api/admin-client-requests
+  const [clientRequests, setClientRequests] = useState<AdminClientRequestItem[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState<boolean>(false);
+  const [requestSearch, setRequestSearch] = useState<string>('');
+  const [requestCategoryFilter, setRequestCategoryFilter] = useState<string>('todos');
+
+  const loadRemoteRequests = async () => {
+    setIsLoadingRequests(true);
+    try {
+      const res = await fetch('/api/admin-client-requests', {
+        method: 'GET',
+        credentials: 'same-origin',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.requests)) {
+          setClientRequests(data.requests);
+        }
+      }
+    } catch (e) {
+      console.warn('Notice: erro ao carregar solicitações do cliente:', e);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
   const loadRemoteProjects = async () => {
     setIsLoadingProjects(true);
     try {
@@ -341,11 +387,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     loadRemoteProjects();
+    loadRemoteRequests();
   }, []);
 
   useEffect(() => {
     if (activeTab === 'projects') {
       loadRemoteProjects();
+    }
+    if (activeTab === 'requests') {
+      loadRemoteRequests();
     }
   }, [activeTab]);
 
@@ -746,6 +796,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   }, [briefings, briefingFilter, briefingSearch]);
 
+  // Solicitações filtradas dos clientes
+  const filteredClientRequests = useMemo(() => {
+    return clientRequests.filter((r) => {
+      if (requestCategoryFilter !== 'todos' && r.category !== requestCategoryFilter) return false;
+      if (!requestSearch.trim()) return true;
+      const q = requestSearch.toLowerCase();
+      return (
+        r.title.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.clientName.toLowerCase().includes(q) ||
+        r.projectName.toLowerCase().includes(q) ||
+        (r.clientBusinessName && r.clientBusinessName.toLowerCase().includes(q))
+      );
+    });
+  }, [clientRequests, requestCategoryFilter, requestSearch]);
+
   // Clientes reais consolidados dos briefings e projetos (SEM DADOS INVENTADOS)
   const derivedClients = useMemo(() => {
     const map = new Map<
@@ -959,6 +1025,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {[
             { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: '📊' },
             { id: 'briefings' as AdminTab, label: `Briefings (${briefings.length})`, icon: '📋' },
+            { id: 'requests' as AdminTab, label: `Solicitações (${clientRequests.length})`, icon: '💬' },
             { id: 'clients' as AdminTab, label: `Clientes (${derivedClients.length})`, icon: '👥' },
             { id: 'projects' as AdminTab, label: `Projetos (${projects.length})`, icon: '🌐' },
             { id: 'demos' as AdminTab, label: `Demos / Amostras (${TOTAL_PROJECTS_COUNT})`, icon: '🖼️' },
@@ -990,7 +1057,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
             {/* Cards com Dados Reais Existentes */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 space-y-1">
                 <span className="text-xs text-neutral-400">Briefings Registrados</span>
                 <div className="text-2xl sm:text-3xl font-bold font-display text-white">
@@ -998,6 +1065,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <span className="text-[11px] text-blue-400 block font-medium">
                   {briefings.filter((b) => b.status === 'Novo').length} novos para triagem
+                </span>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 space-y-1">
+                <span className="text-xs text-neutral-400">Solicitações de Clientes</span>
+                <div className="text-2xl sm:text-3xl font-bold font-display text-cyan-400">
+                  {clientRequests.length}
+                </div>
+                <span className="text-[11px] text-cyan-300 block font-medium">
+                  {clientRequests.filter((r) => r.status === 'Novo').length} novas em aberto
                 </span>
               </div>
 
@@ -1298,6 +1375,142 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            TAB: SOLICITAÇÕES DOS CLIENTES (client_requests)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        {activeTab === 'requests' && (
+          <div className="space-y-5 animate-fadeIn">
+            {/* Barra de Ações e Filtros */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="relative flex-1 sm:max-w-md">
+                  <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={requestSearch}
+                    onChange={(e) => setRequestSearch(e.target.value)}
+                    placeholder="Buscar por projeto, cliente, título ou descrição..."
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-500 outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={loadRemoteRequests}
+                    disabled={isLoadingRequests}
+                    className="min-h-[40px] px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isLoadingRequests ? 'animate-spin' : ''}`} />
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filtros por Categoria */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                  {(['todos', 'Ajuste de Design', 'Troca de Conteúdo', 'Dúvida', 'Correção', 'Outro', 'Briefing'] as const).map(
+                    (cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setRequestCategoryFilter(cat)}
+                        className={`min-h-[34px] px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                          requestCategoryFilter === cat
+                            ? 'bg-cyan-500 text-neutral-950 font-bold'
+                            : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    )
+                  )}
+                </div>
+                <span className="text-xs text-neutral-500">
+                  {filteredClientRequests.length} solicitação(ões)
+                </span>
+              </div>
+            </div>
+
+            {/* Listagem Responsiva de Solicitações */}
+            <div className="space-y-3">
+              {isLoadingRequests && clientRequests.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-2">
+                  <RefreshCw className="w-6 h-6 text-cyan-400 animate-spin mx-auto" />
+                  <p className="text-sm font-semibold text-neutral-300">Carregando solicitações...</p>
+                </div>
+              ) : filteredClientRequests.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-2">
+                  <MessageSquare className="w-8 h-8 text-neutral-600 mx-auto" />
+                  <p className="text-sm font-semibold text-neutral-300">Nenhuma solicitação encontrada.</p>
+                  <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                    As solicitações criadas pelos clientes através da Área do Cliente aparecerão aqui automaticamente.
+                  </p>
+                </div>
+              ) : (
+                filteredClientRequests.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 sm:p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 transition-all space-y-3"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/60 pb-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-white text-sm">{item.projectName}</span>
+                          <span className="text-neutral-600 text-xs">•</span>
+                          <span className="text-xs text-neutral-400 font-medium">
+                            {item.clientName}
+                            {item.clientBusinessName ? ` (${item.clientBusinessName})` : ''}
+                          </span>
+                        </div>
+                        {item.clientEmail && (
+                          <span className="text-[11px] text-neutral-500 font-mono block">
+                            {item.clientEmail}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+                          {item.category}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-800 text-neutral-300">
+                          Prioridade: {item.priority}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60">
+                          {item.status}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-mono pl-1">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : 'Data não disponível'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <h4 className="text-sm font-semibold text-neutral-200">
+                        {item.title}
+                      </h4>
+                      <p className="text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {item.adminReply && (
+                      <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-800/40 text-xs text-slate-300 space-y-1">
+                        <span className="font-semibold text-cyan-400 block text-[11px]">
+                          Resposta NexaWeb ({item.repliedAt ? new Date(item.repliedAt).toLocaleString('pt-BR') : 'Enviada'}):
+                        </span>
+                        <p className="leading-relaxed">{item.adminReply}</p>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -2767,6 +2980,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Solicitações Abertas pelo Cliente neste Projeto */}
+              {(() => {
+                const projectReqs = clientRequests.filter((r) => r.projectId === portalCustomId);
+                return (
+                  <div className="space-y-2 p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-300 font-semibold text-xs flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                        Solicitações do Cliente neste Projeto
+                      </span>
+                      <span className="text-[11px] text-cyan-400 font-bold">
+                        {projectReqs.length} {projectReqs.length === 1 ? 'solicitação' : 'solicitações'}
+                      </span>
+                    </div>
+
+                    {projectReqs.length === 0 ? (
+                      <p className="text-[11px] text-neutral-500 italic">
+                        Nenhuma solicitação enviada pelo cliente deste projeto até o momento.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {projectReqs.map((pr) => (
+                          <div
+                            key={pr.id}
+                            className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] space-y-1"
+                          >
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <span className="font-semibold text-white">{pr.title}</span>
+                              <div className="flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                                  {pr.category}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60">
+                                  {pr.status}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-neutral-400 line-clamp-2 leading-relaxed">
+                              {pr.description}
+                            </p>
+                            <span className="text-[10px] text-neutral-500 block">
+                              {pr.createdAt ? new Date(pr.createdAt).toLocaleString('pt-BR') : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Botões do Rodapé */}
               <div className="pt-3 border-t border-neutral-800 flex items-center justify-end gap-2.5">

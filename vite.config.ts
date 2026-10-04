@@ -51,6 +51,27 @@ function setupAdminMiddlewares(server: any) {
     await handler(req, res);
   });
 
+  // Rota administrativa para listagem de solicitações do cliente
+  server.middlewares.use('/api/admin-client-requests', async (req: any, res: any) => {
+    if (!res.status) {
+      res.status = (code: number) => {
+        res.statusCode = code;
+        return res;
+      };
+    }
+    if (!res.json) {
+      res.json = (data: any) => {
+        if (typeof res.setHeader === 'function') {
+          res.setHeader('Content-Type', 'application/json');
+        }
+        res.end(JSON.stringify(data));
+        return res;
+      };
+    }
+    const { default: handler } = await import('./api/admin-client-requests.ts');
+    await handler(req, res);
+  });
+
   // Mock da API de upload de briefings
   server.middlewares.use('/api/upload-briefing', (req: any, res: any) => {
     if (req.method === 'POST') {
