@@ -573,6 +573,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           stagingUrl: portalStagingUrl.trim() || null,
           productionUrl: portalProductionUrl.trim() || null,
           status: portalStatus,
+          newUpdate: portalHeadline.trim()
+            ? {
+                title: `Atualização: ${portalStage}`,
+                message: portalHeadline.trim(),
+                stage: portalStage,
+                progressSnapshot: Number(portalProgress),
+                visibleToClient: true,
+              }
+            : undefined,
         }),
       });
 
