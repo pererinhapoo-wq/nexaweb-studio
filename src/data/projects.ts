@@ -532,6 +532,58 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
     ],
     plans: DEFAULT_PLANS,
   },
+
+  {
+    id: 'auravet-petshop',
+    name: 'AuraVet — Pet Shop & Veterinária',
+    category: 'Pet Shop / Veterinária',
+    tier: 'Profissional',
+    url: 'https://pet-shop-personalidade-e-profission.vercel.app/',
+    description:
+      'Demonstração conceitual NexaWeb de site para Pet Shop e Clínica Veterinária nos níveis Profissional e Personalizado, com agendamento integrado, especialidades e boutique.',
+    fallbackImage: '/thumbnails/auravet.jpg',
+    tagline: 'Medicina Veterinária Integrada & Boutique de Cuidado.',
+    highlights: [
+      'Agendamento inteligente WhatsApp',
+      'Vitrine de especialidades & CRMVs',
+      'Plantão 24h & emergência',
+      'Protocolo preventivo Cão e Gato',
+      'Boutique animal & farmácia curada',
+    ],
+    clientIndustry: 'Pet Shop / Veterinária',
+    accentColor: 'emerald',
+    briefingType: 'Pet Shop / Veterinário / Banho & Tosa',
+    structure: [
+      'Apresentação institucional',
+      'Especialidades veterinárias',
+      'Corpo clínico com CRMVs',
+      'Agendamento para WhatsApp',
+      'Simulador de protocolo preventivo',
+      'Boutique e farmácia pet',
+      'Ala Cat-Friendly & Fear-Free',
+      'Localização & Plantão 24h',
+    ],
+    plans: [
+      {
+        name: 'Essencial',
+        price: 'R$ 1.000',
+        text: 'Apresentação do Pet Shop e clínica, serviços principais, equipe, localização, WhatsApp fixo e horário de atendimento.',
+        time: 'Prazo: 3–5 dias',
+      },
+      {
+        name: 'Profissional',
+        price: 'R$ 1.700',
+        text: 'Estrutura completa com especialidades veterinárias, agendamento inteligente para WhatsApp, plantão 24h e apresentação dos veterinários.',
+        time: 'Prazo: 5–8 dias',
+      },
+      {
+        name: 'Personalizado',
+        price: 'A partir de R$ 2.800',
+        text: 'Experiência autoral com simulador interativo de protocolo preventivo (Cão/Gato), boutique curada e ala Cat-Friendly.',
+        time: 'Prazo: conforme projeto',
+      },
+    ],
+  },
 ];
 
 export const PREMIUM_PROJECTS: ProjectItem[] = [
@@ -695,7 +747,7 @@ export const PREMIUM_PROJECTS: ProjectItem[] = [
     name: 'Restaurante Premium',
     category: 'Restaurante',
     tier: 'Premium',
-    url: '',
+    url: 'https://restaurante-premium.vercel.app/',
     description:
       'Projeto premium para restaurantes apresentarem sua experiência, cardápio e identidade.',
     fallbackImage: '',
@@ -726,7 +778,7 @@ export const PREMIUM_PROJECTS: ProjectItem[] = [
     name: 'King’s Barber Premium',
     category: 'Barbearia',
     tier: 'Premium',
-    url: '',
+    url: 'https://kings-barber-two.vercel.app/',
     description:
       'Projeto premium para barbearias apresentarem seus serviços, ambiente e identidade de forma sofisticada.',
     fallbackImage: '',

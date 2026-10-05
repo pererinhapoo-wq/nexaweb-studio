@@ -52,6 +52,10 @@ import {
   FEATURE_CATALOG,
   SEGMENT_PRESETS,
   findSegmentPreset,
+  PLAN_BASE_PRICES,
+  OPTION_PRICES,
+  getOptionPrice,
+  getCanonicalOptionId,
   type UserRoleType,
 } from '../data/featureCatalog';
 
@@ -111,11 +115,15 @@ const SECOES_PERSONALIZADO_DEFAULT = [
   'Depoimentos de Clientes',
   'Perguntas Frequentes (FAQ)',
   'Contato / Localização',
+  'Página adicional',
 ];
 
 const FUNCIONALIDADES_PERSONALIZADO_DEFAULT = [
   'Botão fixo de WhatsApp',
   'Formulário comercial direto',
+  'Página adicional',
+  'Formulário personalizado',
+  'Personalização avançada',
   'Galeria de fotos / Trabalhos',
   'Animações suaves de entrada',
   'Efeitos de scroll dinâmicos',
@@ -479,13 +487,55 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     }
   }, [activePlan]);
 
+  // Hook 25b: Cálculo automático de extras e estimativa do projeto
+  const totalExtras = useMemo(() => {
+    const counted = new Set<string>();
+    let sum = 0;
+
+    const addItem = (item: string) => {
+      const canonical = getCanonicalOptionId(item);
+      if (!counted.has(canonical)) {
+        counted.add(canonical);
+        sum += getOptionPrice(item);
+      }
+    };
+
+    for (const item of selectedFuncionalidades) addItem(item);
+    for (const item of selectedAdvancedFeatures) addItem(item);
+    for (const item of selectedRealtimeFeatures) addItem(item);
+    for (const item of selectedSecoes) addItem(item);
+
+    return sum;
+  }, [selectedFuncionalidades, selectedAdvancedFeatures, selectedRealtimeFeatures, selectedSecoes]);
+
+  const basePrice = PLAN_BASE_PRICES[activePlan] || 1700;
+  const isStartingPrice = activePlan === 'Personalizado' || activePlan === 'Premium';
+
+  const formatBRL = (val: number): string => `R$ ${val.toLocaleString('pt-BR')}`;
+
+  const basePriceFormatted = isStartingPrice
+    ? `A partir de ${formatBRL(basePrice)}`
+    : formatBRL(basePrice);
+
+  const extrasFormatted = formatBRL(totalExtras);
+
+  const totalEstimateFormatted = isStartingPrice
+    ? `A partir de ${formatBRL(basePrice + totalExtras)}`
+    : formatBRL(basePrice + totalExtras);
+
   // Hook 26: rawBriefingSummary
   const rawBriefingSummary = useMemo(() => {
     const lines: string[] = [];
     lines.push('🌟 *BRIEFING OFICIAL — NEXAWEB*');
     lines.push('━━━━━━━━━━━━━━━━━━━━');
     lines.push(`💼 *Plano Escolhido:* ${activePlan}`);
-    lines.push(`💰 *Investimento:* ${planData.price}`);
+    if (totalExtras > 0) {
+      lines.push(
+        `💰 *Estimativa do Projeto:* ${totalEstimateFormatted} (Plano Base: ${basePriceFormatted} + Adicionais: ${extrasFormatted})`
+      );
+    } else {
+      lines.push(`💰 *Investimento / Estimativa:* ${totalEstimateFormatted}`);
+    }
     lines.push(`⏱️ *Prazo Estimado:* ${planData.turnaroundTime}`);
 
     if (selectedProject) {
@@ -908,7 +958,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       }
 
       forminitData.append('plano', activePlan);
-      forminitData.append('investimento', planData.price);
+      forminitData.append('investimento', totalEstimateFormatted);
+      forminitData.append('valor_base', basePriceFormatted);
+      forminitData.append('valor_adicionais', extrasFormatted);
       forminitData.append('prazo_estimado', planData.turnaroundTime);
 
       if (selectedProject) {
@@ -1016,7 +1068,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           ...selectedFuncionalidades.slice(0, 4),
         ],
         referenceModel: selectedProject ? selectedProject.name : undefined,
-        estimatedPrice: planData.price,
+        estimatedPrice: totalEstimateFormatted,
         filesCount: photoFiles.length,
         files: uploadedPaths,
       };
@@ -1120,7 +1172,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   </span>
 
                   <span className="text-[11px] sm:text-xs font-extrabold text-neutral-200 shrink-0 whitespace-nowrap">
-                    {planData.price}
+                    {stage === 'presentation' ? planData.price : totalEstimateFormatted}
                   </span>
                 </div>
 
@@ -1467,6 +1519,90 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 ETAPA 2: PERSONALIZAÇÃO & ESTRUTURA (Adaptada ao Plano)
                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
             <div className="space-y-5 animate-fadeIn">
+              {/* Seletor Rápido de Planos no Configurador */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    Plano Base
+                  </span>
+                  <span className="text-[10px] text-neutral-500">
+                    Alterne o plano base a qualquer momento
+                  </span>
+                </div>
+                <div className="p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-neutral-950 border border-neutral-800/90 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none overscroll-x-contain sm:justify-between touch-pan-x">
+                  {(['Profissional', 'Personalizado', 'Premium'] as PlanId[]).map(
+                    (planTab) => {
+                      const isTabActive = activePlan === planTab;
+                      return (
+                        <button
+                          key={planTab}
+                          type="button"
+                          onClick={() => setActivePlan(planTab)}
+                          className={`shrink-0 sm:shrink sm:flex-1 min-h-[34px] sm:min-h-[38px] py-1.5 px-3 sm:px-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1 ${
+                            isTabActive
+                              ? `${theme.badge} shadow-sm border font-extrabold`
+                              : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
+                          }`}
+                        >
+                          <span>{planTab}</span>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+
+              {/* Área Discreta e Clara: Estimativa do Projeto */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-950/95 border border-neutral-800 shadow-sm space-y-2">
+                {totalExtras > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between text-xs text-neutral-300 gap-2 pb-2 border-b border-neutral-800/80">
+                      <div>
+                        <span className="text-neutral-400">Plano base: </span>
+                        <strong className="text-white">{basePriceFormatted}</strong>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400">Adicionais selecionados: </span>
+                        <strong className="text-amber-300">+{extrasFormatted}</strong>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between pt-0.5">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
+                          Estimativa:
+                        </span>
+                        <span className="text-[10px] text-neutral-500">
+                          {isStartingPrice
+                            ? 'Valor inicial estimado conforme opções selecionadas'
+                            : 'Valor estimado conforme opções selecionadas'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl sm:text-2xl font-extrabold font-display text-amber-300">
+                          {totalEstimateFormatted}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
+                        Estimativa do projeto
+                      </span>
+                      <span className="text-[11px] text-neutral-400">
+                        Plano {activePlan} ({basePriceFormatted})
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl sm:text-2xl font-extrabold font-display text-white">
+                        {totalEstimateFormatted}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Common Business Details */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
@@ -1603,6 +1739,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {customSegmentOptions.secoes.map((sec) => {
                         const isSelected = selectedSecoes.includes(sec);
+                        const price = getOptionPrice(sec);
                         return (
                           <button
                             key={sec}
@@ -1610,13 +1747,24 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                             onClick={() =>
                               toggleSelection(selectedSecoes, sec, setSelectedSecoes)
                             }
-                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between ${
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
                               isSelected
                                 ? 'border-purple-500 bg-purple-500/10 text-purple-200'
                                 : 'border-neutral-800 bg-neutral-950/80 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <span className="truncate pr-1">{sec}</span>
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="truncate">{sec}</span>
+                              {price > 0 ? (
+                                <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  +{formatBRL(price)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  Incluso
+                                </span>
+                              )}
+                            </div>
                             {isSelected ? (
                               <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                             ) : (
@@ -1643,6 +1791,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       {customSegmentOptions.recursos.map((func) => {
                         const isSelected = selectedFuncionalidades.includes(func);
                         const isRealtime = func.includes('⚡') || func.includes('tempo real');
+                        const price = getOptionPrice(func);
 
                         return (
                           <button
@@ -1655,7 +1804,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                 setSelectedFuncionalidades
                               )
                             }
-                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between ${
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
                               isSelected
                                 ? 'border-purple-500 bg-purple-500/10 text-purple-200'
                                 : isRealtime
@@ -1663,7 +1812,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                 : 'border-neutral-800 bg-neutral-950/80 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <span className="truncate pr-1">{func}</span>
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="truncate">{func}</span>
+                              {price > 0 ? (
+                                <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  +{formatBRL(price)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  Incluso
+                                </span>
+                              )}
+                            </div>
                             {isSelected ? (
                               <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                             ) : (
@@ -1919,18 +2079,30 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {currentPreset.defaultStructure.map((sec) => {
                         const isSelected = selectedSecoes.includes(sec);
+                        const price = getOptionPrice(sec);
                         return (
                           <button
                             key={sec}
                             type="button"
                             onClick={() => toggleSelection(selectedSecoes, sec, setSelectedSecoes)}
-                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between ${
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
                               isSelected
                                 ? `${theme.borderActive} shadow-sm font-semibold`
                                 : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <span>{sec}</span>
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="truncate">{sec}</span>
+                              {price > 0 ? (
+                                <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  +{formatBRL(price)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  Incluso
+                                </span>
+                              )}
+                            </div>
                             {isSelected ? (
                               <Check className={`w-3.5 h-3.5 ${theme.text} shrink-0`} />
                             ) : (
@@ -1939,6 +2111,35 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                           </button>
                         );
                       })}
+
+                      {/* Opção Rápida de Página Adicional */}
+                      {(() => {
+                        const isSelected = selectedSecoes.includes('Página adicional');
+                        const price = getOptionPrice('Página adicional');
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => toggleSelection(selectedSecoes, 'Página adicional', setSelectedSecoes)}
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? `${theme.borderActive} shadow-sm font-semibold`
+                                : 'border-dashed border-neutral-700 bg-neutral-950/80 text-neutral-300 hover:border-amber-400/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="truncate font-semibold">+ Página adicional</span>
+                              <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                +{formatBRL(price)}
+                              </span>
+                            </div>
+                            {isSelected ? (
+                              <Check className={`w-3.5 h-3.5 ${theme.text} shrink-0`} />
+                            ) : (
+                              <span className="w-3.5 h-3.5 rounded-md border border-neutral-700 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1952,6 +2153,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         const feat = FEATURE_CATALOG[featId];
                         if (!feat) return null;
                         const isSelected = selectedFuncionalidades.includes(featId);
+                        const price = getOptionPrice(featId);
                         return (
                           <button
                             key={featId}
@@ -1963,8 +2165,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                 : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
                             }`}
                           >
-                            <div>
-                              <span className="text-white font-medium block">{feat.name}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-white font-medium">{feat.name}</span>
+                                {price > 0 ? (
+                                  <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                    +{formatBRL(price)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                    Incluso
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-neutral-500 block leading-tight mt-0.5">
                                 {feat.shortDesc}
                               </span>
@@ -1977,6 +2190,44 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                           </button>
                         );
                       })}
+
+                      {/* Opção Formulário Personalizado (se não estiver na lista padrão do segmento) */}
+                      {(() => {
+                        const featId = 'formulario-personalizado';
+                        const feat = FEATURE_CATALOG[featId];
+                        if (!feat || currentPreset.standardFeatures.includes(featId)) return null;
+                        const isSelected = selectedFuncionalidades.includes(featId);
+                        const price = getOptionPrice(featId);
+                        return (
+                          <button
+                            key={featId}
+                            type="button"
+                            onClick={() => toggleFeature(selectedFuncionalidades, featId, setSelectedFuncionalidades)}
+                            className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-start justify-between gap-2 ${
+                              isSelected
+                                ? `${theme.borderActive} shadow-sm font-semibold`
+                                : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-white font-medium">{feat.name}</span>
+                                <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                  +{formatBRL(price)}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-neutral-500 block leading-tight mt-0.5">
+                                {feat.shortDesc}
+                              </span>
+                            </div>
+                            {isSelected ? (
+                              <Check className={`w-3.5 h-3.5 ${theme.text} shrink-0 mt-0.5`} />
+                            ) : (
+                              <span className="w-3.5 h-3.5 rounded-md border border-neutral-700 shrink-0 mt-0.5" />
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -2001,6 +2252,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                           const feat = FEATURE_CATALOG[featId];
                           if (!feat) return null;
                           const isSelected = selectedAdvancedFeatures.includes(featId);
+                          const price = getOptionPrice(featId);
                           return (
                             <button
                               key={featId}
@@ -2012,9 +2264,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                   : 'border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
                               }`}
                             >
-                              <div>
-                                <div className="flex items-center gap-1.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="text-white font-medium">{feat.name}</span>
+                                  {price > 0 ? (
+                                    <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                      +{formatBRL(price)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                      Incluso
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="text-[10px] text-neutral-500 block leading-tight mt-0.5">
                                   {feat.shortDesc}
@@ -2028,6 +2289,44 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                             </button>
                           );
                         })}
+
+                        {/* Opção Personalização Avançada */}
+                        {(() => {
+                          const featId = 'personalizacao-avancada';
+                          const feat = FEATURE_CATALOG[featId];
+                          if (!feat || (currentPreset.advancedFeatures && currentPreset.advancedFeatures.includes(featId))) return null;
+                          const isSelected = selectedAdvancedFeatures.includes(featId);
+                          const price = getOptionPrice(featId);
+                          return (
+                            <button
+                              key={featId}
+                              type="button"
+                              onClick={() => toggleFeature(selectedAdvancedFeatures, featId, setSelectedAdvancedFeatures)}
+                              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-start justify-between gap-2 ${
+                                isSelected
+                                  ? `${theme.borderActive} font-semibold shadow-sm`
+                                  : 'border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-white font-medium">{feat.name}</span>
+                                  <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                    +{formatBRL(price)}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-neutral-500 block leading-tight mt-0.5">
+                                  {feat.shortDesc}
+                                </span>
+                              </div>
+                              {isSelected ? (
+                                <Check className={`w-3.5 h-3.5 ${theme.text} shrink-0 mt-0.5`} />
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-md border border-neutral-700 shrink-0 mt-0.5" />
+                              )}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -2058,6 +2357,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                           const feat = FEATURE_CATALOG[featId];
                           if (!feat) return null;
                           const isSelected = selectedRealtimeFeatures.includes(featId);
+                          const price = getOptionPrice(featId);
                           return (
                             <button
                               key={featId}
@@ -2069,8 +2369,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                                   : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
                               }`}
                             >
-                              <div>
-                                <span className="text-white font-medium block">{feat.name}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-white font-medium block">{feat.name}</span>
+                                  <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                                    +{formatBRL(price)}
+                                  </span>
+                                </div>
                                 <span className="text-[10px] text-neutral-400 block leading-tight mt-0.5">
                                   {feat.shortDesc}
                                 </span>
@@ -2292,6 +2597,57 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 ETAPA 3: INFORMAÇÕES DE CONTATO
                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
             <div className="space-y-4 animate-fadeIn">
+              {/* Estimativa do projeto antes do contato */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-950/95 border border-neutral-800 shadow-sm space-y-2">
+                {totalExtras > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between text-xs text-neutral-300 gap-2 pb-2 border-b border-neutral-800/80">
+                      <div>
+                        <span className="text-neutral-400">Plano base: </span>
+                        <strong className="text-white">{basePriceFormatted}</strong>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400">Adicionais selecionados: </span>
+                        <strong className="text-amber-300">+{extrasFormatted}</strong>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between pt-0.5">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
+                          Estimativa:
+                        </span>
+                        <span className="text-[10px] text-neutral-500">
+                          {isStartingPrice
+                            ? 'Valor inicial estimado conforme opções selecionadas'
+                            : 'Valor estimado do seu projeto configurado'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl sm:text-2xl font-extrabold font-display text-amber-300">
+                          {totalEstimateFormatted}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
+                        Estimativa do projeto
+                      </span>
+                      <span className="text-[11px] text-neutral-400">
+                        Plano {activePlan} ({basePriceFormatted})
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl sm:text-2xl font-extrabold font-display text-white">
+                        {totalEstimateFormatted}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-neutral-800 space-y-1">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
                   Contato do Responsável
@@ -2444,11 +2800,16 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
-                      Investimento
+                      Estimativa do Projeto
                     </span>
-                    <div className="text-sm sm:text-base font-extrabold text-white">
-                      {planData.price}
+                    <div className="text-sm sm:text-base font-extrabold text-amber-300">
+                      {totalEstimateFormatted}
                     </div>
+                    {totalExtras > 0 && (
+                      <span className="text-[10px] text-neutral-400 block mt-0.5">
+                        Base: {basePriceFormatted} | Extras: +{extrasFormatted}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -2606,25 +2967,42 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : stage === 'briefing' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleStepBack}
-                  className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0 gap-1"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Voltar</span>
-                </button>
+              <div className="w-full flex flex-col gap-2">
+                {/* Indicador de Estimativa no Rodapé (visível no mobile e desktop sem cobrir opções) */}
+                <div className="flex items-center justify-between text-xs px-1">
+                  <div className="flex items-center gap-1.5 text-neutral-400 text-[11px] sm:text-xs">
+                    <span className="font-semibold text-neutral-300">Estimativa do projeto:</span>
+                    {totalExtras > 0 && (
+                      <span className="text-[10px] sm:text-[11px] text-neutral-500 hidden xs:inline">
+                        (Base + {extrasFormatted})
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm sm:text-base font-extrabold text-amber-300">
+                    {totalEstimateFormatted}
+                  </span>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setStage('contact')}
-                  className={`flex-1 sm:flex-initial min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
-                >
-                  <span>Continuar para contato</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </>
+                <div className="flex items-center justify-between gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleStepBack}
+                    className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center justify-center shrink-0 gap-1"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Voltar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStage('contact')}
+                    className={`flex-1 sm:flex-initial min-h-[44px] px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${theme.button}`}
+                  >
+                    <span>Continuar para contato</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             ) : stage === 'contact' ? (
               <>
                 <button

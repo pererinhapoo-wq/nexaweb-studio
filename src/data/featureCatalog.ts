@@ -19,6 +19,7 @@ export interface FeatureItem {
   userRoles?: UserRoleType[];
   additionalModule?: string;
   badge?: string;
+  price?: number;
 }
 
 export interface StatsDemonstration {
@@ -51,6 +52,35 @@ export interface SegmentPreset {
 // CATÁLOGO CENTRAL DE TODAS AS FUNCIONALIDADES NEXAWEB
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const FEATURE_CATALOG: Record<string, FeatureItem> = {
+  // Extras e Customizações Disponíveis
+  'pagina-adicional': {
+    id: 'pagina-adicional',
+    name: 'Página adicional',
+    shortDesc: 'Página exclusiva para detalhamento de serviços, termos ou portfólio',
+    complexity: 'Básica',
+    compatiblePlans: ['Profissional', 'Personalizado', 'Premium'],
+    requiresBackend: false,
+    price: 150,
+  },
+  'formulario-personalizado': {
+    id: 'formulario-personalizado',
+    name: 'Formulário personalizado',
+    shortDesc: 'Campos sob medida, envio condicional e disparo customizado',
+    complexity: 'Intermediária',
+    compatiblePlans: ['Profissional', 'Personalizado', 'Premium'],
+    requiresBackend: false,
+    price: 200,
+  },
+  'personalizacao-avancada': {
+    id: 'personalizacao-avancada',
+    name: 'Personalização avançada',
+    shortDesc: 'Recursos exclusivos de layout, efeitos avançados e fluxos sob medida',
+    complexity: 'Avançada',
+    compatiblePlans: ['Profissional', 'Personalizado', 'Premium'],
+    requiresBackend: true,
+    price: 300,
+  },
+
   // Comuns & Essenciais (Básicas)
   'whatsapp-btn': {
     id: 'whatsapp-btn',
@@ -1356,3 +1386,160 @@ export function findSegmentPreset(query?: string | null): SegmentPreset {
 
   return SEGMENT_PRESETS['empresa'];
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TABELA DE PREÇOS BASE DOS PLANOS NO CONFIGURADOR
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export const PLAN_BASE_PRICES: Record<string, number> = {
+  Essencial: 1000,
+  Profissional: 1700,
+  Personalizado: 2800,
+  Premium: 4500,
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TABELA DE PREÇOS DOS EXTRAS E FUNCIONALIDADES ADICIONAIS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export const OPTION_PRICES: Record<string, number> = {
+  // Exemplos explícitos do briefing / configurador
+  'pagina-adicional': 150,
+  'Página adicional': 150,
+  'formulario-personalizado': 200,
+  'Formulário personalizado': 200,
+  'personalizacao-avancada': 300,
+  'Personalização avançada': 300,
+
+  // Funcionalidades comerciais / intermediárias
+  'solicitacao-orcamento': 200,
+  'Calculador / Solicitador de orçamento': 200,
+  'cardapio-digital': 200,
+  'Cardápio digital por categorias': 200,
+  'Cardápio digital': 200,
+  'agendamento-simples': 200,
+  'Módulo de solicitação de agendamento': 200,
+  'Sistema de reserva de mesas': 200,
+  'catalogo-produtos': 200,
+  'Catálogo de produtos com filtros': 200,
+  'Catálogo interativo de itens': 200,
+  'busca-imoveis': 200,
+  'Buscador de imóveis com filtros': 200,
+  'Busca e filtros avançados de imóveis': 200,
+  'galeria-videos': 150,
+  'Exibição de vídeos institucionais': 150,
+  'Galeria técnica de projetos executados': 150,
+  'galeria-fotos': 150,
+  'Galeria de fotos / Trabalhos': 150,
+  'Galeria visual de fotos / trabalhos': 150,
+  'animacoes-suaves': 150,
+  'Animações suaves de entrada': 150,
+  'efeitos-scroll': 150,
+  'Efeitos de scroll dinâmicos': 150,
+
+  // Módulos avançados de sistema (R$ 300)
+  'area-aluno': 300,
+  'Área exclusiva do aluno / cliente': 300,
+  'Área do aluno com login': 300,
+  'historico-treinos': 300,
+  'Histórico de treinos e frequência': 300,
+  'Resultados e histórico de treinos': 300,
+  'estatisticas-progresso': 300,
+  'Estatísticas de progresso e metas': 300,
+  'area-treinador': 300,
+  'Área do treinador / profissional': 300,
+  'painel-administrativo': 300,
+  'Painel administrativo (Dashboard)': 300,
+  'conta-cliente': 300,
+  'Sistema de contas de clientes': 300,
+  'gestao-agenda': 300,
+  'Agenda de atendimentos com múltiplos profissionais': 300,
+  'pedido-online': 300,
+  'Pedido online com carrinho de compras': 300,
+  'Pedidos online com carrinho': 300,
+  'favoritos-busca': 200,
+  'Lista de favoritos e histórico salvo': 200,
+  'Lista de favoritos e imóveis salvos': 200,
+  'acompanhamento-veiculo': 300,
+  'Acompanhamento do status do veículo': 300,
+  'reserva-quartos': 300,
+  'Sistema de reserva de hospedagem e disponibilidade': 300,
+  'cursos-progresso': 300,
+  'Plataforma de aulas com controle de progresso': 300,
+  'galeria-privada': 300,
+  'Galeria privada com seleção e aprovação de fotos': 300,
+  'acompanhamento-obras': 300,
+  'Diário de obras e acompanhamento de projeto': 300,
+  'Diário de obras e relatórios técnicos': 300,
+  'conteudo-exclusivo': 300,
+  'Área VIP de membros / Conteúdos protegidos': 300,
+
+  // Funcionalidades em tempo real (⚡ = R$ 300)
+  'rt-ocupacao-academia': 300,
+  '⚡ Ocupação e fluxo da academia em tempo real': 300,
+  'rt-equipamentos': 300,
+  '⚡ Disponibilidade de equipamentos em uso': 300,
+  'rt-fila-espera-barbearia': 300,
+  '⚡ Fila de espera ao vivo e tempo estimado': 300,
+  'rt-mesas-restaurante': 300,
+  '⚡ Ocupação de mesas e status de pedidos': 300,
+  '⚡ Ocupação de mesas e status em tempo real': 300,
+  'rt-status-imovel': 300,
+  '⚡ Status ao vivo do imóvel (Disponível/Reservado/Vendido)': 300,
+  'rt-status-oficina': 300,
+  '⚡ Etapa da manutenção do veículo em tempo real': 300,
+  'rt-quartos-hotel': 300,
+  '⚡ Disponibilidade instantânea e status de governança': 300,
+  'rt-estoque-ecommerce': 300,
+  '⚡ Estoque sincronizado e status da entrega ao vivo': 300,
+  'rt-aulas-aovivo': 300,
+  '⚡ Aulas acontecendo agora e presença em tempo real': 300,
+  'rt-checkin-eventos': 300,
+  '⚡ Check-in ao vivo de participantes e vagas restantes': 300,
+  'rt-progresso-obras': 300,
+  '⚡ Atualizações e status da obra em tempo real': 300,
+};
+
+// Helper universal de precificação de opções do configurador
+export function getOptionPrice(item: string): number {
+  if (!item) return 0;
+  if (typeof OPTION_PRICES[item] === 'number') {
+    return OPTION_PRICES[item];
+  }
+  const clean = item.replace(/^\+\s*/, '').trim();
+  if (typeof OPTION_PRICES[clean] === 'number') {
+    return OPTION_PRICES[clean];
+  }
+  const feat = FEATURE_CATALOG[item] || FEATURE_CATALOG[clean];
+  if (feat?.price !== undefined) {
+    return feat.price;
+  }
+  for (const f of Object.values(FEATURE_CATALOG)) {
+    if (
+      f.name.toLowerCase() === item.toLowerCase() ||
+      f.id.toLowerCase() === item.toLowerCase() ||
+      f.name.toLowerCase() === clean.toLowerCase() ||
+      f.id.toLowerCase() === clean.toLowerCase()
+    ) {
+      return f.price ?? 0;
+    }
+  }
+  return 0;
+}
+
+export function getCanonicalOptionId(item: string): string {
+  if (!item) return '';
+  const clean = item.replace(/^\+\s*/, '').trim();
+  if (FEATURE_CATALOG[item]) return FEATURE_CATALOG[item].id;
+  if (FEATURE_CATALOG[clean]) return FEATURE_CATALOG[clean].id;
+  for (const f of Object.values(FEATURE_CATALOG)) {
+    if (
+      f.name.toLowerCase() === item.toLowerCase() ||
+      f.id.toLowerCase() === item.toLowerCase() ||
+      f.name.toLowerCase() === clean.toLowerCase() ||
+      f.id.toLowerCase() === clean.toLowerCase()
+    ) {
+      return f.id;
+    }
+  }
+  return clean.toLowerCase();
+}
+

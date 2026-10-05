@@ -21,6 +21,7 @@ import {
   PROFISSIONAL_PROJECTS,
   PREMIUM_PROJECTS,
   ALL_PROJECTS,
+  isProjectPublished,
   type ProjectItem,
 } from './data/projects';
 import { ProjectCard } from './components/ProjectCard';
@@ -851,7 +852,7 @@ export default function App() {
                     Amostras Profissional
                   </h3>
                   <span className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.2 rounded-full font-bold">
-                    3 Sites no Ar
+                    {PROFISSIONAL_PROJECTS.filter(isProjectPublished).length} Sites no Ar
                   </span>
                 </div>
 

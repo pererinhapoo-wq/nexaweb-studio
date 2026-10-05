@@ -188,6 +188,14 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   }`}
                   loading="lazy"
                 />
+              ) : project.fallbackImage ? (
+                <div className="relative w-full h-[360px] sm:h-[480px] bg-neutral-950 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={project.fallbackImage}
+                    alt={project.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               ) : (
                 <div className="h-[260px] sm:h-[340px] flex items-center justify-center p-6 text-center">
                   <div>
