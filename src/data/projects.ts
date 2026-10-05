@@ -747,7 +747,7 @@ export const PREMIUM_PROJECTS: ProjectItem[] = [
     name: 'Restaurante Premium',
     category: 'Restaurante',
     tier: 'Premium',
-    url: 'https://restaurante-premium.vercel.app/',
+    url: 'https://grok-workspace-puce.vercel.app/',
     description:
       'Projeto premium para restaurantes apresentarem sua experiência, cardápio e identidade.',
     fallbackImage: '',
