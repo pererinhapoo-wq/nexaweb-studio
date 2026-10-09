@@ -1423,13 +1423,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     Investimento Oficial
                   </span>
                   <div className="font-extrabold font-display text-white leading-tight">
-                    {planData.price.includes('A partir de') ? (
+                    {/a partir de/i.test(planData.price) ? (
                       <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5">
                         <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                          A partir de
+                          a partir de
                         </span>
                         <span className="text-2xl sm:text-3xl font-extrabold text-white whitespace-nowrap">
-                          {planData.price.replace('A partir de', '').trim()}
+                          {planData.price.replace(/a partir de/i, '').trim()}
                         </span>
                       </div>
                     ) : (

@@ -43,7 +43,7 @@ const CREATOR_PLANS: ProjectPlan[] = [
   },
   {
     name: 'Personalizado',
-    price: 'A partir de R$ 2.800',
+    price: 'a partir de R$ 2.800',
     text: 'Estrutura sob medida para projetos com identidade própria, integrações, recursos especiais e necessidades específicas.',
     time: 'Prazo: conforme projeto',
   },
@@ -578,7 +578,7 @@ export const PROFISSIONAL_PROJECTS: ProjectItem[] = [
       },
       {
         name: 'Personalizado',
-        price: 'A partir de R$ 2.800',
+        price: 'a partir de R$ 2.800',
         text: 'Experiência autoral com simulador interativo de protocolo preventivo (Cão/Gato), boutique curada e ala Cat-Friendly.',
         time: 'Prazo: conforme projeto',
       },

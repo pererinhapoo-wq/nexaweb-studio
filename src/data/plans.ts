@@ -49,7 +49,7 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
     id: 'Personalizado',
     name: 'Personalizado',
     badge: 'Sob Medida · Exclusivo',
-    price: 'A partir de R$ 2.800',
+    price: 'a partir de R$ 2.800',
     tagline: 'Um projeto sob medida criado de acordo com as necessidades do seu negócio',
     description:
       'Liberdade total de configuração. Você escolhe o estilo visual, as seções necessárias, as funcionalidades desejadas e como imagina o site.',
@@ -109,7 +109,7 @@ export const PLANS_DATA: Record<PlanId, PlanDetailData> = {
     id: 'Premium',
     name: 'Premium',
     badge: 'Nível 03 · Alto Padrão',
-    price: 'A partir de R$ 4.500',
+    price: 'a partir de R$ 4.500',
     tagline: 'A experiência máxima de sofisticação visual, tecnologia e exclusividade',
     description:
       'Desenvolvido para marcas que desejam impressionar e se destacar no mercado de alto padrão com um site impecável, imersivo e de alto valor percebido.',

@@ -9,9 +9,11 @@ import {
   Info,
   HelpCircle,
   Eye,
+  PlusCircle,
 } from 'lucide-react';
 import type { PlanId } from '../data/plans';
 import { PLANS_DATA } from '../data/plans';
+import { AdditionalFeaturesTable } from './AdditionalFeaturesTable';
 
 const PlanDetailModal = lazy(() =>
   import('./PlanDetailModal').then((m) => ({ default: m.PlanDetailModal }))
@@ -28,7 +30,8 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
   const [detailModalPlan, setDetailModalPlan] = useState<PlanId | null>(null);
   const [advisorModalOpen, setAdvisorModalOpen] = useState(false);
 
-  const plans: PlanId[] = ['Essencial', 'Personalizado', 'Profissional', 'Premium'];
+  // Official plans order matching the commercial pricing table
+  const plans: PlanId[] = ['Essencial', 'Profissional', 'Personalizado', 'Premium'];
 
   return (
     <section
@@ -50,8 +53,8 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
           Veja o que está incluído em cada plano antes de escolher. Você preenche um briefing centralizado e nós cuidamos de todo o desenvolvimento.
         </p>
 
-        {/* Guided Assistant Prompt */}
-        <div className="pt-2">
+        {/* Guided Assistant & Jump to Addons Prompt */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => setAdvisorModalOpen(true)}
@@ -60,6 +63,14 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
             <HelpCircle className="w-4 h-4 text-amber-400" />
             <span>Ainda não sabe qual escolher? Me ajude a escolher</span>
           </button>
+
+          <a
+            href="#funcionalidades-adicionais"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-950/80 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-neutral-200 text-xs font-medium transition-all"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-neutral-400" />
+            <span>Ver tabela de adicionais</span>
+          </a>
         </div>
       </div>
 
@@ -180,6 +191,9 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
           );
         })}
       </div>
+
+      {/* Additional Features Commercial Table */}
+      <AdditionalFeaturesTable onSelectPlan={onSelectPlan} />
 
       {/* Plan Details Presentation Modal */}
       {detailModalPlan && (
