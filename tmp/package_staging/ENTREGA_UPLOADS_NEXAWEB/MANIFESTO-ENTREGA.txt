@@ -77,13 +77,7 @@ administrativa segura de quarentena.
     - Guia detalhado passo a passo de implantação em staging e checklist de testes reais.
 
 13. tests/cron-sweeper-simulation.test.mjs
-    - Suíte de 27 testes unitários simulados em memória cobrindo todos os cenários críticos (concorrência, falha dupla, leases, quarentena e expurgo auditado).
-
-14. tests/test-upload-suite.mjs
-    - Suíte de 22 testes de validação do handler de upload (/api/upload-briefing.ts), garantindo integridade de ticket HMAC, bloqueio de tamanho, limites de quota e rollback de reservas.
-
-15. tests/test-e2e-handler.mjs
-    - Suíte de validação dos handlers serverless e Vercel Cron, garantindo autenticação Bearer com tempo constante, mitigação de falhas em RPCs e compatibilidade dos fluxos.
+    - Suíte de 66 testes unitários simulados em memória cobrindo todos os cenários críticos (concorrência, falha dupla, leases, quarentena e expurgo auditado).
 
 --------------------------------------------------------------------------------
 2. RESUMO DE CONFORMIDADE DOS REQUISITOS DE SEGURANÇA
