@@ -1,0 +1,78 @@
+================================================================================
+MANIFESTO DE ENTREGA - PACOTE DE INTEGRAÇÃO DE UPLOADS NEXAWEB
+Pacote: ENTREGA_UPLOADS_NEXAWEB_COM_ADMIN_PROJECTS.zip
+Data da Geração: 2026-10-10
+================================================================================
+
+Este pacote consolida e corrige a integração de upload de briefings, armazenamento
+privado e rotina de limpeza automatizada (sweeper/quarentena) para a NexaWeb.
+
+--------------------------------------------------------------------------------
+1. RESUMO DAS CORREÇÕES EFETUADAS
+--------------------------------------------------------------------------------
+1. Incompatibilidade SQL em 'reservation_expires_at':
+   - A coluna foi alterada para aceitar NULL (removido NOT NULL da definição).
+   - Incluído 'alter table public.project_attachments alter column reservation_expires_at drop not null;'
+     para garantir idempotência caso a migração seja executada sobre um schema existente.
+   - A RPC finish_project_attachment agora opera sem conflito de restrição NOT NULL.
+
+2. Tratamento seguro de falhas de upload no Supabase Storage:
+   - Em api/upload-briefing.ts, ao detectar falha de upload, o sistema executa
+     explicitamente a remoção do arquivo residual no bucket privado via
+     supabase.storage.from('nexaweb-vault').remove([pathname]) antes de registrar
+     a liberação do anexo.
+   - Diferenciação estrita de falhas físicas no Storage e falhas de auditoria no banco.
+
+3. Validação rigorosa de 'NEXAWEB_UPLOAD_TICKET_SECRET':
+   - Em caso de ausência da variável no servidor, o endpoint responde com status 500
+     e erro explicativo sobre configuração incompleta do ambiente.
+   - Em api/create-briefing.ts, ausência do segredo gera log explícito de diagnóstico.
+
+4. Quarentena de Anexos com Falha Reincidente (Dead-Letter):
+   - Criada a RPC 'public.get_quarantined_attachments(p_min_attempts, p_limit)' no SQL.
+   - A RPC 'record_attachment_cleanup_failure' retorna o estado atualizado e se o item
+     atingiu quarentena (cleanup_attempts >= 10).
+   - api/cron-cleanup-attachments.ts e api/admin-projects.ts suportam consulta de quarentena.
+
+5. Proteção contra CSRF e Controle de Acesso no Cron:
+   - Requisições GET exigem estritamente 'Authorization: Bearer <CRON_SECRET>'.
+   - Requisições manuais via POST por administradores exigem sessão válida e cabeçalhos
+     de proteção contra CSRF (Sec-Fetch-Site: same-origin ou X-Requested-With / X-Admin-Action).
+
+6. Inclusão dos Endpoints e Módulos Ausentes:
+   - Incluído api/admin-projects.ts com suporte a listagem de projetos, geração de URLs
+     assinadas temporárias (TTL 120s) e consulta de quarentena.
+   - Incluídos os módulos de sessão api/_session.ts e api/_portal-session.ts.
+
+7. Atualização do Painel Administrativo (AdminDashboard.tsx):
+   - Painel integrado com botão para acionamento manual da rotina de limpeza com CSRF seguro.
+   - Exibição de estatísticas e visualização de arquivos em quarentena para auditoria.
+
+--------------------------------------------------------------------------------
+2. ARQUIVOS CONTIDOS NO PACOTE
+--------------------------------------------------------------------------------
+- .env.example
+- MANIFESTO-ENTREGA.txt
+- MIGRACAO_UPLOADS_PENDENTE.sql
+- README-INTEGRACAO.md
+- vercel.json
+- api/_portal-session.ts
+- api/_session.ts
+- api/admin-projects.ts
+- api/create-briefing.ts
+- api/cron-cleanup-attachments.ts
+- api/upload-briefing.ts
+- src/components/AdminDashboard.tsx
+- src/components/ContactModal.tsx
+- tests/cron-sweeper-simulation.test.mjs
+- tests/test-e2e-handler.mjs
+- tests/test-upload-suite.mjs
+
+--------------------------------------------------------------------------------
+3. INSTRUÇÕES PARA APLICAÇÃO (APÓS APROVAÇÃO)
+--------------------------------------------------------------------------------
+1. Copie as variáveis descritas em .env.example para o arquivo .env de produção.
+2. Execute a migração MIGRACAO_UPLOADS_PENDENTE.sql no SQL Editor do Supabase.
+3. Certifique-se de que o bucket 'nexaweb-vault' esteja criado como PRIVADO no Storage.
+4. Faça o deploy da aplicação na Vercel para ativar as Serverless Functions e o Vercel Cron.
+================================================================================
