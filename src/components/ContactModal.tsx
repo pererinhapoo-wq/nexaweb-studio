@@ -796,7 +796,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     setUploadStatus('idle');
   };
 
-  const uploadPhotos = async (targetProjectId?: string): Promise<string[]> => {
+  const uploadPhotos = async (targetProjectId?: string, uploadTicket?: string): Promise<string[]> => {
     if (!photoFiles.length) return [];
     if (!targetProjectId) {
       console.warn('Upload de fotos cancelado: targetProjectId ausente.');
@@ -816,6 +816,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           `/api/upload-briefing?projectId=${encodeURIComponent(targetProjectId)}`,
           {
             method: 'POST',
+            headers: uploadTicket ? { 'x-nexaweb-upload-ticket': uploadTicket } : {},
             body: formDataToUpload,
           }
         );
@@ -877,6 +878,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
     // 1. Criação prioritária do briefing e projeto no Supabase para obter o projectId determinístico
     let createdProjectId: string | null = null;
+    let createdUploadTicket: string | null = null;
     try {
       const supabaseResponse = await fetch('/api/create-briefing', {
         method: 'POST',
@@ -899,6 +901,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         if (supabaseData?.projectId) {
           createdProjectId = supabaseData.projectId;
         }
+        if (typeof supabaseData?.uploadTicket === 'string') {
+          createdUploadTicket = supabaseData.uploadTicket;
+        }
         if (supabaseData?.accessToken) {
           setPortalAccessToken(supabaseData.accessToken);
         }
@@ -919,7 +924,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     // 2. Upload determinístico dos arquivos associados ao projectId gerado
     let uploadedPaths: string[] = [];
     if (photoFiles.length > 0 && createdProjectId) {
-      uploadedPaths = await uploadPhotos(createdProjectId);
+      uploadedPaths = await uploadPhotos(createdProjectId, createdUploadTicket || undefined);
     }
 
     // 3. Envio seguro e centralizado para o Forminit (sem interromper o cliente se houver falha de rede)

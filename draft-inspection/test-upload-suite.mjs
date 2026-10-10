@@ -248,6 +248,20 @@ async function runAllTests() {
     assert('1. Bloqueio imediato quando ticket está ausente', res.statusCode === 401 && res.responseData?.error?.includes('ausente'), JSON.stringify(res));
   }
 
+  // TEST 1.1: NEXAWEB_UPLOAD_TICKET_SECRET ausente no servidor (deve retornar 500 com mensagem clara)
+  {
+    const savedSecret = process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
+    delete process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
+    const res = await executeUpload(handler, mockClient, {
+      projectId: validProjectId,
+      ticket: 'any.ticket',
+      fileBuffer: validJpg,
+      mimeType: 'image/jpeg',
+    });
+    process.env.NEXAWEB_UPLOAD_TICKET_SECRET = savedSecret;
+    assert('1.1 Bloqueio e erro claro 500 quando NEXAWEB_UPLOAD_TICKET_SECRET está ausente', res.statusCode === 500 && res.responseData?.error?.includes('NEXAWEB_UPLOAD_TICKET_SECRET'), JSON.stringify(res));
+  }
+
   // TEST 2: Ticket com assinatura adulterada (deve retornar 401)
   {
     const tamperedTicket = createTicket(validProjectId, SECRET, { tampered: true });

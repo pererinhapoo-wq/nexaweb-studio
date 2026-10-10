@@ -39,13 +39,22 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Identificador do projeto inválido ou ausente.' });
     }
 
+    const uploadSecret = process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
+    if (!uploadSecret || typeof uploadSecret !== 'string' || uploadSecret.trim() === '') {
+      console.error('CONFIG_ERROR: NEXAWEB_UPLOAD_TICKET_SECRET não está configurada no servidor.');
+      return res.status(500).json({
+        error: 'Configuração do servidor incompleta: variável NEXAWEB_UPLOAD_TICKET_SECRET não definida no ambiente.',
+      });
+    }
+
     const ticket = typeof req.headers?.['x-nexaweb-upload-ticket'] === 'string'
       ? req.headers['x-nexaweb-upload-ticket'].trim()
       : '';
-    const uploadSecret = process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
 
-    if (!ticket || !uploadSecret) {
-      return res.status(401).json({ error: 'Autorização temporária de upload ausente. Atualize a versão do formulário.' });
+    if (!ticket) {
+      return res.status(401).json({
+        error: 'Ticket de autorização de upload ausente. Envie o formulário novamente para gerar um novo ticket.',
+      });
     }
 
     const [payloadPart, signature] = ticket.split('.');
@@ -229,11 +238,25 @@ export default async function handler(req: any, res: any) {
 
     if (uploadError) {
       console.error('UPLOAD_STORAGE_ERROR', uploadError.message);
+      let storageRemovalFailed = false;
+      try {
+        const { error: removeErr } = await supabase.storage.from('nexaweb-vault').remove([pathname]);
+        if (removeErr) {
+          storageRemovalFailed = true;
+          console.error('STORAGE_REMOVAL_ON_UPLOAD_ERROR_FAILED', removeErr.message);
+        }
+      } catch (err) {
+        storageRemovalFailed = true;
+        console.error('STORAGE_REMOVAL_ON_UPLOAD_ERROR_EXCEPTION', err);
+      }
+
       try {
         await supabase.rpc('release_project_attachment', {
           p_attachment_id: attachmentId,
-          p_reason: `STORAGE_UPLOAD_ERROR: ${uploadError.message}`,
-          p_failed_storage: false,
+          p_reason: storageRemovalFailed
+            ? `STORAGE_UPLOAD_AND_REMOVAL_FAILED: ${uploadError.message}`
+            : `STORAGE_UPLOAD_ERROR: ${uploadError.message}`,
+          p_failed_storage: storageRemovalFailed,
         });
       } catch (releaseErr) {
         console.error('RELEASE_ATTACHMENT_ERROR', releaseErr);

@@ -271,6 +271,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Visualização ampliada de imagem do briefing (lightbox)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
+  // Rotina de limpeza de anexos (Sweeper) e Quarentena
+  const [isRunningCleanup, setIsRunningCleanup] = useState<boolean>(false);
+  const [cleanupResult, setCleanupResult] = useState<{
+    succeeded?: number;
+    failed?: number;
+    quarantined?: number;
+    message?: string;
+  } | null>(null);
+  const [quarantinedFiles, setQuarantinedFiles] = useState<any[]>([]);
+  const [isLoadingQuarantine, setIsLoadingQuarantine] = useState<boolean>(false);
+
+  const handleRunManualCleanup = async () => {
+    if (isRunningCleanup) return;
+    setIsRunningCleanup(true);
+    setCleanupResult(null);
+    try {
+      const res = await fetch('/api/cron-cleanup-attachments', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-Admin-Action': 'cleanup-attachments',
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCleanupResult({
+          succeeded: data.succeeded ?? 0,
+          failed: data.failed ?? 0,
+          quarantined: data.quarantined ?? 0,
+          message: data.message || `Limpeza concluída: ${data.succeeded ?? 0} excluídos com sucesso, ${data.failed ?? 0} falhas.`,
+        });
+        if (data.quarantined > 0) {
+          handleFetchQuarantine();
+        }
+      } else {
+        setCleanupResult({
+          message: data.error || 'Falha ao executar rotina de limpeza.',
+        });
+      }
+    } catch (err: any) {
+      setCleanupResult({
+        message: err?.message || 'Falha de comunicação com o servidor.',
+      });
+    } finally {
+      setIsRunningCleanup(false);
+    }
+  };
+
+  const handleFetchQuarantine = async () => {
+    setIsLoadingQuarantine(true);
+    try {
+      const res = await fetch('/api/admin-projects?action=cleanup-quarantine', {
+        credentials: 'same-origin',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuarantinedFiles(Array.isArray(data.quarantined) ? data.quarantined : []);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar anexos em quarentena:', e);
+    } finally {
+      setIsLoadingQuarantine(false);
+    }
+  };
+
   // Busca e sincroniza arquivos do briefing selecionado
   useEffect(() => {
     // Limpa imediatamente o estado ao alternar ou carregar briefing para evitar manter arquivos anteriores
@@ -2340,6 +2407,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Download className="w-3.5 h-3.5" />
                     <span>Exportar Backup dos Briefings (JSON)</span>
                   </button>
+                </div>
+              )}
+            </div>
+
+            {/* Rotina Automática de Limpeza de Anexos (Sweeper) & Quarentena */}
+            <div className="p-5 sm:p-6 rounded-3xl bg-neutral-900/80 border border-neutral-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <Shield className="w-5 h-5" />
+                  <h4 className="text-sm sm:text-base font-bold font-display text-white">
+                    Limpeza de Anexos Órfãos & Quarentena (Sweeper)
+                  </h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleFetchQuarantine}
+                    disabled={isLoadingQuarantine}
+                    className="min-h-[36px] px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-300 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>{isLoadingQuarantine ? 'Buscando...' : 'Ver Quarentena'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRunManualCleanup}
+                    disabled={isRunningCleanup}
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-semibold text-amber-300 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRunningCleanup ? 'animate-spin' : ''}`} />
+                    <span>{isRunningCleanup ? 'Executando...' : 'Executar Limpeza Manual'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                A rotina de limpeza expira reservas pendentes e remove arquivos órfãos do bucket privado <code className="text-amber-300">nexaweb-vault</code>. Arquivos que excedem o limite de 10 tentativas de remoção entram em quarentena segura para revisão.
+              </p>
+
+              {cleanupResult && (
+                <div className={`p-3 rounded-2xl border text-xs ${cleanupResult.failed && cleanupResult.failed > 0 ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'}`}>
+                  <div className="font-semibold">{cleanupResult.message}</div>
+                  {typeof cleanupResult.quarantined === 'number' && (
+                    <div className="text-[11px] mt-1 text-neutral-400">
+                      Anexos em quarentena no sistema: {cleanupResult.quarantined}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {quarantinedFiles.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-neutral-800">
+                  <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Anexos em Quarentena ({quarantinedFiles.length})
+                  </span>
+                  <div className="max-h-48 overflow-y-auto space-y-1.5">
+                    {quarantinedFiles.map((q: any) => (
+                      <div key={q.id} className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] flex items-center justify-between">
+                        <div className="min-w-0 pr-2">
+                          <div className="font-mono text-neutral-300 truncate">{q.storage_path}</div>
+                          <div className="text-neutral-500 text-[10px]">
+                            Tentativas: {q.cleanup_attempts} | Erro: {q.last_cleanup_error || 'Desconhecido'}
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 shrink-0">
+                          {q.state}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

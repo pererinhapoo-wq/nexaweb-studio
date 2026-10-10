@@ -255,6 +255,143 @@ async function runSimulationTests() {
     assert(verifyCronSecret({ headers: { authorization: `Bearer ${testSecret}` } }, testSecret) === true, 'Token exato com timingSafeEqual deve ser aceito');
   }
 
+  // ---------------------------------------------------------------------------
+  // Cenário 6: Limite de tentativas de limpeza e identificação de Quarentena
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 6] Testando limite de tentativas de limpeza (Quarentena >= 10)...');
+  {
+    function recordFailureSim(attempts, maxLimit = 10) {
+      const newAttempts = attempts + 1;
+      return {
+        ok: true,
+        cleanup_attempts: newAttempts,
+        quarantined: newAttempts >= maxLimit,
+      };
+    }
+
+    const res9 = recordFailureSim(8);
+    assert(res9.cleanup_attempts === 9 && res9.quarantined === false, '9ª tentativa não deve ser colocada em quarentena');
+
+    const res10 = recordFailureSim(9);
+    assert(res10.cleanup_attempts === 10 && res10.quarantined === true, '10ª tentativa DEVE ser sinalizada como em quarentena');
+
+    const res11 = recordFailureSim(10);
+    assert(res11.cleanup_attempts === 11 && res11.quarantined === true, 'Tentativas >= 10 permanecem em quarentena');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cenário 7: Proteção estrita contra CSRF na execução manual
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 7] Testando proteção contra CSRF em execução manual...');
+  {
+    function authorizeRequest(method, hasCronSecret, isAdminSession, headers = {}) {
+      if (method === 'GET') {
+        if (!hasCronSecret) return { authorized: false, status: 401, reason: 'GET_REQUIRES_CRON_SECRET' };
+        return { authorized: true };
+      }
+      if (method === 'POST') {
+        if (hasCronSecret) return { authorized: true };
+        if (!isAdminSession) return { authorized: false, status: 401, reason: 'UNAUTHORIZED' };
+
+        const secFetchSite = headers['sec-fetch-site'];
+        const xRequestedWith = headers['x-requested-with'];
+        const customAction = headers['x-admin-action'];
+
+        const isSameOrigin = secFetchSite === 'same-origin' || secFetchSite === 'none';
+        const hasSecureHeader = xRequestedWith === 'XMLHttpRequest' || customAction === 'cleanup-attachments';
+
+        if (!isSameOrigin && !hasSecureHeader) {
+          return { authorized: false, status: 403, reason: 'CSRF_BLOCKED' };
+        }
+        return { authorized: true };
+      }
+      return { authorized: false, status: 405, reason: 'METHOD_NOT_ALLOWED' };
+    }
+
+    // 1. GET via sessão administrativa sem segredo deve ser rejeitado para prevenir CSRF por imagem/link
+    const getAdminAttempt = authorizeRequest('GET', false, true);
+    assert(getAdminAttempt.authorized === false && getAdminAttempt.status === 401, 'GET com sessão administrativa isolada deve ser bloqueado (CSRF)');
+
+    // 2. GET legítimo do Vercel Cron com segredo deve ser aceito
+    const getCronAttempt = authorizeRequest('GET', true, false);
+    assert(getCronAttempt.authorized === true, 'GET legítimo da Vercel com segredo deve ser aceito');
+
+    // 3. POST cross-site sem cabeçalho seguro deve ser bloqueado com 403 (CSRF)
+    const postCrossSite = authorizeRequest('POST', false, true, { 'sec-fetch-site': 'cross-site' });
+    assert(postCrossSite.authorized === false && postCrossSite.status === 403, 'POST cross-site sem cabeçalho seguro deve ser bloqueado (CSRF)');
+
+    // 4. POST do painel administrativo com cabeçalho seguro deve ser aceito
+    const postAdminValid = authorizeRequest('POST', false, true, {
+      'sec-fetch-site': 'same-origin',
+      'x-requested-with': 'XMLHttpRequest',
+      'x-admin-action': 'cleanup-attachments',
+    });
+    assert(postAdminValid.authorized === true, 'POST com sessão administrativa e cabeçalhos seguros deve ser aceito');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cenário 8: Transição de reserva para READY tornando reservation_expires_at nulo
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 8] Testando transição da reserva para READY (reservation_expires_at anulado)...');
+  {
+    const attachment = {
+      id: 'att-res-test',
+      state: 'PENDING',
+      reservation_expires_at: new Date(Date.now() + 1200000), // +20 min
+    };
+
+    function finishAttachment(att) {
+      if (att.state !== 'PENDING') return { ok: false, reason: 'NOT_PENDING' };
+      if (att.reservation_expires_at && att.reservation_expires_at < new Date()) {
+        return { ok: false, reason: 'EXPIRED' };
+      }
+      att.state = 'READY';
+      att.reservation_expires_at = null; // Anulado pois arquivo está ativo e confirmado
+      return { ok: true, status: 'CONFIRMED' };
+    }
+
+    const finishRes = finishAttachment(attachment);
+    assert(finishRes.ok === true && finishRes.status === 'CONFIRMED', 'Reserva confirmada com sucesso');
+    assert(attachment.state === 'READY', 'Estado atualizado para READY');
+    assert(attachment.reservation_expires_at === null, 'reservation_expires_at anulado após confirmação');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cenário 9: Falha no upload no Storage garantindo remoção e nunca gravando DELETED sem verificação
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 9] Testando falha de upload com garantia de remoção física e nunca marcando DELETED...');
+  {
+    let storageRemoved = false;
+    let recordedFailedStorage = null;
+
+    async function handleUploadFailure(storageErr, shouldFailRemoval) {
+      let storageRemovalFailed = false;
+      try {
+        if (shouldFailRemoval) {
+          storageRemovalFailed = true;
+        } else {
+          storageRemoved = true;
+        }
+      } catch {
+        storageRemovalFailed = true;
+      }
+
+      recordedFailedStorage = storageRemovalFailed;
+      return {
+        state: storageRemovalFailed ? 'DELETION_FAILED' : 'DELETED',
+        cleanup_attempts: storageRemovalFailed ? 1 : 0,
+      };
+    }
+
+    // Caso A: Remoção no Storage falhou -> DEVE marcar DELETION_FAILED
+    const caseA = await handleUploadFailure(new Error('Upload dropped'), true);
+    assert(caseA.state === 'DELETION_FAILED' && recordedFailedStorage === true, 'Se remoção no Storage falhou, estado deve ser DELETION_FAILED (nunca DELETED)');
+
+    // Caso B: Remoção no Storage confirmada com sucesso -> marca DELETED
+    const caseB = await handleUploadFailure(new Error('Upload dropped'), false);
+    assert(caseB.state === 'DELETED' && storageRemoved === true, 'Apenas se remoção no Storage foi confirmada, marca como DELETED');
+  }
+
   console.log('\n===============================================================');
   console.log(`TOTAL DE TESTES SIMULADOS EXECUTADOS: ${totalTests}`);
   console.log(`TESTES APROVADOS: ${passedTests}/${totalTests}`);

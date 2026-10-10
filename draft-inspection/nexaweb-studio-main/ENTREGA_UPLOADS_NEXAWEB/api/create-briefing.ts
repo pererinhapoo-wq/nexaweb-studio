@@ -161,7 +161,9 @@ export default async function handler(req: any, res: any) {
 
     const uploadSecret = process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
     let uploadTicket: string | null = null;
-    if (uploadSecret) {
+    if (!uploadSecret || typeof uploadSecret !== 'string' || uploadSecret.trim() === '') {
+      console.error('CONFIG_ERROR: NEXAWEB_UPLOAD_TICKET_SECRET não está configurada no servidor. uploadTicket não pôde ser gerado.');
+    } else {
       const payload = Buffer.from(JSON.stringify({
         projectId: project.id,
         iat: Date.now(),

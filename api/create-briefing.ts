@@ -159,12 +159,28 @@ export default async function handler(req: any, res: any) {
       console.error('Erro ao gerar client_access inicial:', tokenErr);
     }
 
+    const uploadSecret = process.env.NEXAWEB_UPLOAD_TICKET_SECRET;
+    let uploadTicket: string | null = null;
+    if (!uploadSecret || typeof uploadSecret !== 'string' || uploadSecret.trim() === '') {
+      console.error('CONFIG_ERROR: NEXAWEB_UPLOAD_TICKET_SECRET não está configurada no servidor. uploadTicket não pôde ser gerado.');
+    } else {
+      const payload = Buffer.from(JSON.stringify({
+        projectId: project.id,
+        iat: Date.now(),
+        exp: Date.now() + 15 * 60 * 1000,
+        nonce: crypto.randomBytes(16).toString('hex'),
+      })).toString('base64url');
+      const signature = crypto.createHmac('sha256', uploadSecret).update(payload).digest('base64url');
+      uploadTicket = `${payload}.${signature}`;
+    }
+
     return res.status(200).json({
       success: true,
       clientId: client.id,
       projectId: project.id,
       requestId: request.id,
       accessToken,
+      uploadTicket,
     });
   } catch (error) {
     console.error('Erro ao salvar briefing:', error);

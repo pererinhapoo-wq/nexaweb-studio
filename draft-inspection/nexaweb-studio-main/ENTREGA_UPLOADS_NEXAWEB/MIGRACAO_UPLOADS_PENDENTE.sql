@@ -95,7 +95,7 @@ create table if not exists public.project_attachments (
   mime_type text not null check (mime_type in ('image/jpeg', 'image/png', 'image/webp')),
   size_bytes bigint not null check (size_bytes > 0 and size_bytes <= 15728640),
   state text not null default 'PENDING' check (state in ('PENDING', 'READY', 'DELETING', 'DELETED', 'DELETION_FAILED')),
-  reservation_expires_at timestamptz not null default (now() + interval '20 minutes'),
+  reservation_expires_at timestamptz default (now() + interval '20 minutes'),
   cleanup_attempts integer not null default 0 check (cleanup_attempts >= 0),
   cleanup_lease_token uuid,
   cleanup_lease_expires_at timestamptz,
@@ -103,6 +103,9 @@ create table if not exists public.project_attachments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Garante idempotência: remove NOT NULL caso a tabela tenha sido criada em versão anterior
+alter table public.project_attachments alter column reservation_expires_at drop not null;
 
 create index if not exists project_attachments_project_state_idx
   on public.project_attachments(project_id, state);
@@ -204,7 +207,8 @@ begin
          reservation_expires_at = null,
          updated_at = now()
    where id = p_attachment_id
-     and state = 'PENDING';
+     and state = 'PENDING'
+     and (reservation_expires_at is null or reservation_expires_at > now());
 
   if found then
     return jsonb_build_object('ok', true, 'status', 'CONFIRMED');
@@ -321,6 +325,8 @@ create or replace function public.record_attachment_cleanup_failure(
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp
 as $$
+declare
+  v_new_attempts integer;
 begin
   update public.project_attachments
      set state = 'DELETION_FAILED',
@@ -331,14 +337,46 @@ begin
          updated_at = now()
    where id = p_attachment_id
      and cleanup_lease_token = p_lease_token
-     and (cleanup_lease_expires_at is null or cleanup_lease_expires_at > now());
+     and (cleanup_lease_expires_at is null or cleanup_lease_expires_at > now())
+   returning cleanup_attempts into v_new_attempts;
 
   if found then
-    return jsonb_build_object('ok', true);
+    return jsonb_build_object(
+      'ok', true,
+      'cleanup_attempts', v_new_attempts,
+      'quarantined', (v_new_attempts >= 10)
+    );
   else
     return jsonb_build_object('ok', false, 'reason', 'LEASE_MISMATCH_OR_EXPIRED');
   end if;
 end;
+$$;
+
+-- 4.4 Identificação e auditoria de anexos em quarentena (limite de tentativas de limpeza atingido >= 10)
+create or replace function public.get_quarantined_attachments(
+  p_min_attempts integer default 10,
+  p_limit integer default 50
+) returns table (
+  id uuid,
+  project_id uuid,
+  storage_path text,
+  mime_type text,
+  size_bytes bigint,
+  state text,
+  cleanup_attempts integer,
+  last_cleanup_error text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql security definer set search_path = public, pg_temp
+as $$
+  select id, project_id, storage_path, mime_type, size_bytes, state,
+         cleanup_attempts, last_cleanup_error, created_at, updated_at
+    from public.project_attachments
+   where cleanup_attempts >= coalesce(p_min_attempts, 10)
+      or (state = 'DELETION_FAILED' and cleanup_attempts >= coalesce(p_min_attempts, 10))
+   order by updated_at desc
+   limit coalesce(p_limit, 50);
 $$;
 
 -- ------------------------------------------------------------------------------
@@ -351,6 +389,7 @@ revoke all on function public.release_project_attachment(uuid, text, boolean) fr
 revoke all on function public.claim_attachments_for_cleanup(integer, integer) from public, anon, authenticated;
 revoke all on function public.confirm_attachment_deleted(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.record_attachment_cleanup_failure(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.get_quarantined_attachments(integer, integer) from public, anon, authenticated;
 
 grant execute on function public.reserve_project_attachment(uuid, text, text, bigint) to service_role;
 grant execute on function public.finish_project_attachment(uuid) to service_role;
@@ -358,6 +397,7 @@ grant execute on function public.release_project_attachment(uuid, text, boolean)
 grant execute on function public.claim_attachments_for_cleanup(integer, integer) to service_role;
 grant execute on function public.confirm_attachment_deleted(uuid, uuid) to service_role;
 grant execute on function public.record_attachment_cleanup_failure(uuid, uuid, text) to service_role;
+grant execute on function public.get_quarantined_attachments(integer, integer) to service_role;
 
 commit;
 

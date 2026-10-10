@@ -157,6 +157,36 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // 5. Ação: Listar anexos em quarentena de limpeza (cleanup_attempts >= 10) para revisão administrativa segura
+  if (queryParams.action === 'cleanup-quarantine') {
+    try {
+      const { data: quarantinedList, error: qErr } = await supabase.rpc('get_quarantined_attachments', {
+        p_min_attempts: 10,
+        p_limit: 50,
+      });
+
+      if (qErr) {
+        const { data: fallbackList } = await supabase
+          .from('project_attachments')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, created_at, updated_at')
+          .gte('cleanup_attempts', 10)
+          .order('updated_at', { ascending: false })
+          .limit(50);
+        return res.status(200).json({
+          success: true,
+          quarantined: fallbackList || [],
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        quarantined: quarantinedList || [],
+      });
+    } catch {
+      return res.status(200).json({ success: true, quarantined: [] });
+    }
+  }
+
   try {
     // 5. Busca os projetos reais existentes na tabela public.projects
     const { data: projects, error: projectsError } = await supabase

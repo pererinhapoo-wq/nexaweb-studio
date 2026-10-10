@@ -410,7 +410,7 @@ async function runE2E() {
     });
 
     // Worker com token incorreto tenta registrar falha -> deve falhar
-    const resWrongToken = await originalFetch('https://mock.supabase.co/rest/v1/rpc/record_attachment_cleanup_failure', {
+    const resWrongToken = await fetch('https://mock.supabase.co/rest/v1/rpc/record_attachment_cleanup_failure', {
       method: 'POST',
       body: JSON.stringify({ p_attachment_id: idFail, p_lease_token: tokenIncorreto, p_error: 'err' }),
     });
@@ -420,7 +420,7 @@ async function runE2E() {
 
     // Registro com lease expirado
     mockState.attachments.get(idFail).cleanup_lease_expires_at = Date.now() - 5000;
-    const resExpiredToken = await originalFetch('https://mock.supabase.co/rest/v1/rpc/record_attachment_cleanup_failure', {
+    const resExpiredToken = await fetch('https://mock.supabase.co/rest/v1/rpc/record_attachment_cleanup_failure', {
       method: 'POST',
       body: JSON.stringify({ p_attachment_id: idFail, p_lease_token: tokenCorreto, p_error: 'err' }),
     });
