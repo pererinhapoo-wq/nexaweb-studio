@@ -1,0 +1,81 @@
+================================================================================
+NEXAWEB STUDIO - MANIFESTO DE ENTREGA E AUDITORIA DE SEGURANÇA DE UPLOADS
+PACOTE: ENTREGA_UPLOADS_NEXAWEB_COM_ADMIN_PROJECTS.zip
+DATA DA GERAÇÃO: 2026-10-10
+================================================================================
+
+Este manifesto documenta e certifica todos os arquivos, correções de segurança,
+contratos de RPC e garantias de conformidade do pacote de uploads da NexaWeb.
+
+--------------------------------------------------------------------------------
+1. COMPOSIÇÃO DO PACOTE
+--------------------------------------------------------------------------------
+
+1. MIGRACAO_UPLOADS_PENDENTE.sql
+   - Script PostgreSQL transacional (BEGIN...COMMIT) e idempotente.
+   - Configuração estrita dos buckets: 'nexaweb-vault' (PRIVADO) e 'nexaweb-public' (PÚBLICO).
+   - Tabela 'public.project_attachments' com coluna 'reservation_expires_at' anulável.
+   - 7 RPCs com SECURITY DEFINER concedidas exclusivamente à role 'service_role'.
+
+2. api/admin-projects.ts (OBRIGATÓRIO)
+   - Endpoint administrativo autenticado com verifySession(req).
+   - Ação 'briefing-files': gera URLs assinadas temporárias (60 min) do bucket privado 'nexaweb-vault'.
+   - Ação 'cleanup-quarantine': consulta e audita anexos com >= 10 falhas de limpeza via RPC get_quarantined_attachments.
+
+3. api/upload-briefing.ts
+   - Validação pré-stream de NEXAWEB_UPLOAD_TICKET_SECRET (HTTP 500 explicativo se ausente).
+   - Validação de ticket HMAC-SHA256 em tempo constante (timingSafeEqual).
+   - Descarte imediato de streams acima de 15 MiB sem sobrecarga de memória (stream.resume()).
+   - Verificação ativa de remoção física no Storage em falhas de upload antes de atualizar banco.
+   - Se remoção física falhar, grava 'DELETION_FAILED' (nunca 'DELETED' sem confirmação).
+
+4. api/create-briefing.ts
+   - Emissão de ticket temporário (15 min) vinculado ao projectId gerado.
+   - Diagnóstico claro se NEXAWEB_UPLOAD_TICKET_SECRET estiver ausente no servidor.
+
+5. api/cron-cleanup-attachments.ts
+   - Rotina Sweeper com leases concorrentes de 120s via SKIP LOCKED.
+   - Autenticação do Vercel Cron via Authorization: Bearer <CRON_SECRET> com timingSafeEqual.
+   - Proteção estrita contra CSRF: método GET requer CRON_SECRET (bloqueia links/tags externas).
+   - Disparo manual pelo administrador requer POST com cabeçalhos seguros (Sec-Fetch-Site / X-Requested-With).
+   - Retorna métrica 'quarantined' e suporta ?action=quarantine para inspeção segura.
+
+6. api/_session.ts
+   - Utilitário de autenticação e validação de sessão administrativa com cookie HMAC.
+
+7. api/_portal-session.ts
+   - Utilitário de hashing e validação de tokens da Área do Cliente.
+
+8. src/components/ContactModal.tsx
+   - Formulário de briefing do cliente: recebe uploadTicket e repassa via cabeçalho 'x-nexaweb-upload-ticket'.
+
+9. src/components/AdminDashboard.tsx
+   - Upload de portfólio no bucket público permanente 'nexaweb-public'.
+   - Visualização de briefings via URLs assinadas de 'nexaweb-vault'.
+   - Interface de execução manual do Sweeper com cabeçalhos anti-CSRF e visualização da quarentena.
+
+10. vercel.json
+    - Agendamento do Vercel Cron para '/api/cron-cleanup-attachments' a cada hora ('0 * * * *').
+    - Regras de roteamento e cabeçalhos de segurança 'no-store' para rotas /api/*.
+
+11. .env.example
+    - Documentação de todas as variáveis de ambiente necessárias sem exposição de segredos.
+
+12. README-INTEGRACAO.md
+    - Guia detalhado passo a passo de implantação em staging e checklist de testes reais.
+
+13. tests/cron-sweeper-simulation.test.mjs
+    - Suíte de 27 testes unitários simulados em memória cobrindo todos os cenários críticos.
+
+--------------------------------------------------------------------------------
+2. RESUMO DE CONFORMIDADE DOS REQUISITOS DE SEGURANÇA
+--------------------------------------------------------------------------------
+[✓] 1. Compatibilidade de 'reservation_expires_at' com finish_project_attachment (anulável).
+[✓] 2. Falhas de upload com remoção no Storage verificada antes de marcar status no banco.
+[✓] 3. Validação de NEXAWEB_UPLOAD_TICKET_SECRET com HTTP 500 claro quando ausente.
+[✓] 4. Cotas de 15 MiB/arquivo, 5 arquivos/projeto e 50 MiB/projeto transacionais.
+[✓] 5. Leases concorrentes de 120s, limite de 10 tentativas e quarentena segura.
+[✓] 6. Proteção contra CSRF no cron e autorização restrita na auditoria de quarentena.
+[✓] 7. 7 RPCs sincronizadas entre SQL, endpoints e frontend.
+[✓] 8. Isolamento do bucket 'nexaweb-vault' estritamente privado via URLs assinadas temporárias.
+================================================================================

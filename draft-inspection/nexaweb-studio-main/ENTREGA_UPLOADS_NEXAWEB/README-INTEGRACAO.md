@@ -11,13 +11,17 @@ Este pacote contém todos os arquivos novos e modificados que compõem a soluç�
 | Arquivo no Pacote | Caminho de Destino no Projeto Principal | Natureza | Função Principal |
 | :--- | :--- | :--- | :--- |
 | `MIGRACAO_UPLOADS_PENDENTE.sql` | `MIGRACAO_UPLOADS_PENDENTE.sql` (ou Supabase SQL Editor) | **Novo** | Script transacional (`BEGIN; ... COMMIT;`) contendo criação e verificação estrita dos buckets (`nexaweb-vault` e `nexaweb-public`), tabela `public.project_attachments` (com `reservation_expires_at` anulável), RLS restrito a `service_role` e 7 RPCs atômicas com `SECURITY DEFINER`. |
+| `api/admin-projects.ts` | `api/admin-projects.ts` | **Modificado** | Endpoint administrativo com consulta segura via `verifySession`, geração de URLs assinadas de 60 min para briefings privados em `nexaweb-vault` e ação `cleanup-quarantine` para auditoria de anexos em quarentena (`cleanup_attempts >= 10`). |
 | `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Novo** | Endpoint serverless da rotina de limpeza agendada (Sweeper). Autenticação via `CRON_SECRET` com `timingSafeEqual`, proteção estrita contra CSRF em disparos manuais, leases concorrentes via `SKIP LOCKED`, verificação de quarentena e diferenciação de falhas (`DELETION_FAILED_UNRECORDED`, `DELETION_FAILED`, `CONFIRMATION_FAILED`, `DELETED`). |
 | `api/upload-briefing.ts` | `api/upload-briefing.ts` | **Modificado** | Processamento multipart de upload com validação antecipada de `NEXAWEB_UPLOAD_TICKET_SECRET` (retorna HTTP 500 explícito quando ausente), validação HMAC do ticket sem consumo de stream, descarte imediato ao exceder 15 MiB (`stream.resume()`), bifurcação segura entre imagens públicas (`nexaweb-public`) e briefings privados (`nexaweb-vault`), além de verificação ativa no Storage para nunca gravar `DELETED` sem confirmação de remoção. |
 | `api/create-briefing.ts` | `api/create-briefing.ts` | **Modificado** | Emissão do ticket criptográfico temporário (`uploadTicket`, HMAC-SHA256, expiração de 15 min) vinculado ao `projectId` recém-criado, com diagnóstico claro se `NEXAWEB_UPLOAD_TICKET_SECRET` não estiver definida. |
+| `api/_session.ts` | `api/_session.ts` | **Incluído** | Utilitário server-side de validação e emissão de sessões administrativas seguras com cookie HMAC e tempo constante. |
+| `api/_portal-session.ts` | `api/_portal-session.ts` | **Incluído** | Utilitário server-side de validação de tokens e sessão da Área do Cliente com SHA-256 e HMAC. |
 | `src/components/ContactModal.tsx` | `src/components/ContactModal.tsx` | **Modificado** | Frontend do formulário de briefing: recebe `uploadTicket` gerado por `create-briefing` e o repassa no cabeçalho `x-nexaweb-upload-ticket` durante o envio dos anexos. |
 | `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Modificado** | Painel administrativo: upload de imagens de portfólio direcionado para `nexaweb-public` (URLs públicas permanentes sem expiração), visualizador de briefings com URLs assinadas temporárias para `nexaweb-vault`, botão para disparo manual seguro do Sweeper com cabeçalho anti-CSRF e painel de revisão de anexos em quarentena. |
 | `vercel.json` | `vercel.json` | **Modificado** | Configuração do agendador nativo da Vercel (`crons`) apontando para `/api/cron-cleanup-attachments` em frequência horária (`0 * * * *`). |
 | `.env.example` | `.env.example` | **Modificado** | Documentação de referência contendo todas as variáveis necessárias para a aplicação e infraestrutura. |
+| `MANIFESTO-ENTREGA.txt` | `MANIFESTO-ENTREGA.txt` | **Novo** | Manifesto descritivo de auditoria contendo certificação de integridade e requisitos atendidos. |
 | `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Novo** | Suíte de testes unitários simulados em memória (27 cenários de validação da máquina de estados, leases, timingSafeEqual, quarentena, CSRF e tolerância a falhas). |
 
 ---
@@ -112,6 +116,9 @@ Copie os arquivos deste pacote para os seus respectivos destinos no repositório
 cp api/cron-cleanup-attachments.ts api/
 cp api/upload-briefing.ts api/
 cp api/create-briefing.ts api/
+cp api/admin-projects.ts api/
+cp api/_session.ts api/
+cp api/_portal-session.ts api/
 cp src/components/ContactModal.tsx src/components/
 cp src/components/AdminDashboard.tsx src/components/
 cp vercel.json ./
