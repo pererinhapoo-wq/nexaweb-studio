@@ -1,0 +1,6 @@
+{
+  "name": "NexaWeb - Sites Profissionais, Essencial, Personalizado e Premium",
+  "description": "Portfólio oficial da NexaWeb: conheça nossos projetos nos planos Essencial, Personalizado, Profissional e Premium. Sites modernos, rápidos e 100% responsivos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
