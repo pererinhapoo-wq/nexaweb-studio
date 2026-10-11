@@ -10,19 +10,21 @@ Este pacote contém todos os arquivos novos e modificados que compõem a soluç�
 
 | Arquivo no Pacote | Caminho de Destino no Projeto Principal | Natureza | Função Principal |
 | :--- | :--- | :--- | :--- |
-| `MIGRACAO_UPLOADS_PENDENTE.sql` | `MIGRACAO_UPLOADS_PENDENTE.sql` (ou Supabase SQL Editor) | **Novo** | Script transacional (`BEGIN; ... COMMIT;`) contendo criação e verificação estrita dos buckets (`nexaweb-vault` e `nexaweb-public`), tabela `public.project_attachments` (com `reservation_expires_at` anulável), RLS restrito a `service_role` e 7 RPCs atômicas com `SECURITY DEFINER`. |
-| `api/admin-projects.ts` | `api/admin-projects.ts` | **Modificado** | Endpoint administrativo com consulta segura via `verifySession`, geração de URLs assinadas de 60 min para briefings privados em `nexaweb-vault` e ação `cleanup-quarantine` para auditoria de anexos em quarentena (`cleanup_attempts >= 10`). |
-| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Novo** | Endpoint serverless da rotina de limpeza agendada (Sweeper). Autenticação via `CRON_SECRET` com `timingSafeEqual`, proteção estrita contra CSRF em disparos manuais, leases concorrentes via `SKIP LOCKED`, verificação de quarentena e diferenciação de falhas (`DELETION_FAILED_UNRECORDED`, `DELETION_FAILED`, `CONFIRMATION_FAILED`, `DELETED`). |
+| `MIGRACAO_UPLOADS_PENDENTE.sql` | `MIGRACAO_UPLOADS_PENDENTE.sql` (ou Supabase SQL Editor) | **Novo** | Script transacional (`BEGIN; ... COMMIT;`) contendo criação e verificação estrita dos buckets (`nexaweb-vault` e `nexaweb-public`), tabela `public.project_attachments` (com `quarantine_notes` e `quarantine_resolved_at`), RLS restrito a `service_role` e 9 RPCs atômicas com `SECURITY DEFINER`. |
+| `api/admin-projects.ts` | `api/admin-projects.ts` | **Modificado** | Endpoint administrativo com consulta segura via `verifySession`, geração de URLs assinadas de 60 segundos para briefings privados em `nexaweb-vault`, ação `cleanup-quarantine` para auditoria, e ações seguras `quarantine-retry` e `quarantine-dismiss` (com validação prévia de remoção no Storage e justificativa de auditoria). |
+| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Novo** | Endpoint serverless da rotina de limpeza agendada (Sweeper horária). Autenticação via `CRON_SECRET` com `timingSafeEqual`, proteção estrita contra CSRF em disparos manuais, leases concorrentes via `SKIP LOCKED`, incremento atômico preventivo de `cleanup_attempts` no claim para impedir falha dupla, verificação de quarentena (limite 10) e diferenciação de falhas (`DELETION_FAILED_UNRECORDED`, `DELETION_FAILED`, `CONFIRMATION_FAILED`, `DELETED`). |
 | `api/upload-briefing.ts` | `api/upload-briefing.ts` | **Modificado** | Processamento multipart de upload com validação antecipada de `NEXAWEB_UPLOAD_TICKET_SECRET` (retorna HTTP 500 explícito quando ausente), validação HMAC do ticket sem consumo de stream, descarte imediato ao exceder 15 MiB (`stream.resume()`), bifurcação segura entre imagens públicas (`nexaweb-public`) e briefings privados (`nexaweb-vault`), além de verificação ativa no Storage para nunca gravar `DELETED` sem confirmação de remoção. |
 | `api/create-briefing.ts` | `api/create-briefing.ts` | **Modificado** | Emissão do ticket criptográfico temporário (`uploadTicket`, HMAC-SHA256, expiração de 15 min) vinculado ao `projectId` recém-criado, com diagnóstico claro se `NEXAWEB_UPLOAD_TICKET_SECRET` não estiver definida. |
 | `api/_session.ts` | `api/_session.ts` | **Incluído** | Utilitário server-side de validação e emissão de sessões administrativas seguras com cookie HMAC e tempo constante. |
 | `api/_portal-session.ts` | `api/_portal-session.ts` | **Incluído** | Utilitário server-side de validação de tokens e sessão da Área do Cliente com SHA-256 e HMAC. |
 | `src/components/ContactModal.tsx` | `src/components/ContactModal.tsx` | **Modificado** | Frontend do formulário de briefing: recebe `uploadTicket` gerado por `create-briefing` e o repassa no cabeçalho `x-nexaweb-upload-ticket` durante o envio dos anexos. |
-| `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Modificado** | Painel administrativo: upload de imagens de portfólio direcionado para `nexaweb-public` (URLs públicas permanentes sem expiração), visualizador de briefings com URLs assinadas temporárias para `nexaweb-vault`, botão para disparo manual seguro do Sweeper com cabeçalho anti-CSRF e painel de revisão de anexos em quarentena. |
+| `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Modificado** | Painel administrativo: upload de imagens de portfólio direcionado para `nexaweb-public` (URLs públicas permanentes sem expiração), visualizador de briefings com URLs assinadas temporárias (60s) para `nexaweb-vault`, botão para disparo manual seguro do Sweeper com cabeçalho anti-CSRF, painel de revisão de anexos em quarentena com botões integrados de "Reenfileirar" (Retry) e "Dispensar" (Dismiss com justificativa). |
 | `vercel.json` | `vercel.json` | **Modificado** | Configuração do agendador nativo da Vercel (`crons`) apontando para `/api/cron-cleanup-attachments` em frequência horária (`0 * * * *`). |
 | `.env.example` | `.env.example` | **Modificado** | Documentação de referência contendo todas as variáveis necessárias para a aplicação e infraestrutura. |
 | `MANIFESTO-ENTREGA.txt` | `MANIFESTO-ENTREGA.txt` | **Novo** | Manifesto descritivo de auditoria contendo certificação de integridade e requisitos atendidos. |
-| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Novo** | Suíte de testes unitários simulados em memória (27 cenários de validação da máquina de estados, leases, timingSafeEqual, quarentena, CSRF e tolerância a falhas). |
+| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Novo** | Suíte de testes unitários simulados em memória (cenários de validação da máquina de estados, leases, timingSafeEqual, falha dupla, limites do contador, quarentena, CSRF e tolerância a falhas). |
+| `tests/test-upload-suite.mjs` | `tests/test-upload-suite.mjs` | **Novo** | Suíte de testes do handler de upload (`/api/upload-briefing.ts`): validação de tickets HMAC, descarte seguro de streams, validação de tipos e tamanhos de imagem, cotas acumuladas e reversão em caso de falha. |
+| `tests/test-e2e-handler.mjs` | `tests/test-e2e-handler.mjs` | **Novo** | Suíte de testes ponta a ponta dos handlers serverless: autenticação por token seguro no Vercel Cron, transições de estado no sweeper, proteção contra CSRF e compatibilidade dos fluxos de cliente e administrador. |
 
 ---
 
@@ -52,17 +54,19 @@ Este pacote contém todos os arquivos novos e modificados que compõem a soluç�
 2. **`READY`**: Upload concluído com sucesso e confirmado de forma idempotente via `finish_project_attachment`. O campo `reservation_expires_at` é anulado (`NULL`).
 3. **`DELETING`**: Registro reivindicado atômica e concorrentemente pelo Sweeper via `claim_attachments_for_cleanup` com `SKIP LOCKED` e `lease_token` ativo por 2 minutos.
 4. **`DELETED`**: Remoção física confirmada no Supabase Storage e registrada no banco via `confirm_attachment_deleted` (ou cancelamento imediato verificado). Liberado da cota ativa.
-5. **`DELETION_FAILED`**: Falha na remoção física do Storage ou durante o cancelamento imediato. O contador `cleanup_attempts` é incrementado. Caso atinja `>= 10`, entra em **Quarentena** e não é mais reivindicado automaticamente, ficando disponível para revisão administrativa.
+5. **`DELETION_FAILED`**: Falha na remoção física do Storage ou durante o cancelamento imediato. O contador `cleanup_attempts` é incrementado atomicamente no claim para evitar loops infinitos em caso de falha dupla. Ao atingir `>= 10`, entra em **Quarentena** e não é mais reivindicado automaticamente, ficando disponível para revisão administrativa (Retry ou Dismiss com justificativa).
 
-### 2.3 Lista Completa das 7 Funções RPC (com `SECURITY DEFINER` e restrição a `service_role`)
+### 2.3 Lista Completa das 9 Funções RPC (com `SECURITY DEFINER` e restrição a `service_role`)
 
 1. `reserve_project_attachment(p_project_id uuid, p_storage_path text, p_mime_type text, p_size_bytes bigint) RETURNS jsonb`: Reserva atômica com bloqueio `FOR UPDATE` no projeto, validação de limite de 5 arquivos e 50 MiB cumulativos por projeto.
 2. `finish_project_attachment(p_attachment_id uuid) RETURNS jsonb`: Confirmação idempotente do anexo: valida reserva vigente, transiciona para `READY` e anula `reservation_expires_at`.
 3. `release_project_attachment(p_attachment_id uuid, p_reason text, p_failed_storage boolean) RETURNS jsonb`: Liberação de reserva em caso de falha imediata. Se `p_failed_storage = true`, transiciona para `DELETION_FAILED`; se `false`, para `DELETED`.
-4. `claim_attachments_for_cleanup(p_batch_size integer, p_lease_seconds integer) RETURNS TABLE(...)`: Reivindicação segura de lotes de arquivos para exclusão (`PENDING` expirados ou `DELETION_FAILED` com `cleanup_attempts < 10`), aplicando `SKIP LOCKED`.
-5. `confirm_attachment_deleted(p_attachment_id uuid, p_lease_token uuid) RETURNS jsonb`: Confirmação definitiva de remoção física no Storage validando a posse e validade temporal do `lease_token`. Transiciona para `DELETED`.
-6. `record_attachment_cleanup_failure(p_attachment_id uuid, p_lease_token uuid, p_error text) RETURNS jsonb`: Registra falha de exclusão física, incrementa `cleanup_attempts` e sinaliza se o anexo atingiu quarentena (`quarantined: true` para `>= 10`).
-7. `get_quarantined_attachments(p_min_attempts integer, p_limit integer) RETURNS TABLE(...)`: Consulta segura para administradores auditarem anexos que falharam repetidamente e requerem intervenção manual.
+4. `claim_attachments_for_cleanup(p_batch_size integer, p_lease_seconds integer) RETURNS TABLE(...)`: Reivindicação segura de lotes com `SKIP LOCKED`, incremento atômico de `cleanup_attempts` para prevenção de falha dupla, e bloqueio de novas reivindicações quando `cleanup_attempts >= 10`.
+5. `confirm_attachment_deleted(p_attachment_id uuid, p_lease_token uuid) RETURNS jsonb`: Confirmação definitiva de remoção física no Storage validando estritamente token não-nulo e lease ativo não-nulo (`cleanup_lease_expires_at > now()`). Diferencia respostas entre `LEASE_EXPIRED` e `LEASE_MISMATCH`. Transiciona para `DELETED`.
+6. `record_attachment_cleanup_failure(p_attachment_id uuid, p_lease_token uuid, p_error text) RETURNS jsonb`: Registra falha de exclusão física sem duplicar o contador (já incrementado no claim), validando lease ativo e retornando sinalização de quarentena (`quarantined: true` para `>= 10`).
+7. `get_quarantined_attachments(p_min_attempts integer, p_limit integer) RETURNS TABLE(...)`: Consulta segura para administradores auditarem anexos com falhas recorrentes, incluindo `quarantine_notes` e `quarantine_resolved_at`.
+8. `admin_retry_quarantined_attachment(p_attachment_id uuid) RETURNS jsonb`: Recuperação administrativa segura: valida que o item está em quarentena (`attempts >= 10`), que não há lease ativo de worker, zera `cleanup_attempts = 0`, anexa nota em `quarantine_notes` e reenfileira para `DELETING`.
+9. `admin_dismiss_quarantined_attachment(p_attachment_id uuid, p_justification text) RETURNS jsonb`: Expurgo administrativo justificado: exige justificativa mínima (5 caracteres), valida quarentena e ausência de lease ativo, finaliza como `DELETED` e grava nota de auditoria e data em `quarantine_resolved_at`.
 
 ### 2.4 Variáveis de Ambiente Necessárias
 
@@ -123,15 +127,25 @@ cp src/components/ContactModal.tsx src/components/
 cp src/components/AdminDashboard.tsx src/components/
 cp vercel.json ./
 cp .env.example ./
-mkdir -p tests && cp tests/cron-sweeper-simulation.test.mjs tests/
+mkdir -p tests
+cp tests/cron-sweeper-simulation.test.mjs tests/
+cp tests/test-upload-suite.mjs tests/
+cp tests/test-e2e-handler.mjs tests/
 ```
 
 ### Passo 4: Verificação Local de Compilação e Testes
-Execute no projeto:
+Execute as suítes de testes automatizados e verificações de compilação:
 ```bash
-node tests/cron-sweeper-simulation.test.mjs
-npm run lint   # tsc --noEmit
-npm run build  # vite build
+# Execução das 3 suítes de testes incluídas:
+node tests/cron-sweeper-simulation.test.mjs  # 27 testes de simulação de RPCs, leases e quarentena
+node tests/test-upload-suite.mjs             # 22 testes de tickets HMAC, streams e cotas
+node tests/test-e2e-handler.mjs              # Testes E2E dos handlers serverless e Vercel Cron
+
+# Verificação de tipos TypeScript no projeto oficial:
+npx tsc --noEmit
+
+# Compilação do frontend de produção:
+npx vite build
 ```
 Certifique-se de que todos os comandos finalizem com código de saída 0.
 

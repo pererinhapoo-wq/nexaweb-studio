@@ -190,7 +190,8 @@ export default async function handler(req: any, res: any) {
           p_error: errorMessage,
         });
 
-        const isQuarantined = Boolean(failData?.quarantined || (cleanup_attempts && cleanup_attempts + 1 >= 10));
+        // Como o incremento atômico ocorre no claim, cleanup_attempts já reflete a tentativa corrente
+        const isQuarantined = Boolean(failData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
 
         if (failRpcError || !failData?.ok) {
           const failReason = failRpcError?.message || failData?.reason || 'Falha na RPC de registro de erro';

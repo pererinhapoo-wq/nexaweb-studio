@@ -1,0 +1,111 @@
+================================================================================
+NEXAWEB STUDIO - MANIFESTO DE ENTREGA E AUDITORIA DE SEGURANÇA DE UPLOADS
+PACOTE: ENTREGA_UPLOADS_NEXAWEB_COM_ADMIN_PROJECTS.zip (REVISÃO FINAL DE INTEGRAÇÃO)
+DATA DA GERAÇÃO: 2026-10-10
+================================================================================
+
+Este manifesto documenta e certifica todos os arquivos, correções de segurança,
+contratos de RPC e garantias de conformidade do pacote de uploads da NexaWeb,
+com foco na resolução da falha dupla, controle estrito de leases e recuperação
+administrativa segura de quarentena.
+
+--------------------------------------------------------------------------------
+1. COMPOSIÇÃO DO PACOTE
+--------------------------------------------------------------------------------
+
+1. MIGRACAO_UPLOADS_PENDENTE.sql
+   - Script PostgreSQL transacional (BEGIN...COMMIT) e idempotente.
+   - Configuração estrita dos buckets: 'nexaweb-vault' (PRIVADO) e 'nexaweb-public' (PÚBLICO).
+   - Tabela 'public.project_attachments' com colunas 'quarantine_notes' e 'quarantine_resolved_at'.
+   - 9 RPCs com SECURITY DEFINER concedidas exclusivamente à role 'service_role'.
+   - Incremento atômico de 'cleanup_attempts' na reivindicação (claim) com limite de 10 tentativas.
+   - Remoção do incremento duplicado na RPC de falha.
+   - Eliminação de aceitação de lease nulo nas confirmações de sucesso e falha.
+   - Diferenciação determinística entre LEASE_EXPIRED e LEASE_MISMATCH.
+   - Novas RPCs administrativas: admin_retry_quarantined_attachment e admin_dismiss_quarantined_attachment.
+
+2. api/admin-projects.ts (OBRIGATÓRIO)
+   - Endpoint administrativo autenticado com verifySession(req) e proteção CSRF.
+   - Ação 'briefing-files': gera URLs assinadas temporárias com TTL estrito de 60 segundos do bucket privado 'nexaweb-vault'.
+   - Ação 'cleanup-quarantine': consulta e audita anexos com >= 10 falhas de limpeza via RPC get_quarantined_attachments.
+   - Ação 'quarantine-retry': reabilita item em quarentena resetando tentativas para 0 e preservando histórico.
+   - Ação 'quarantine-dismiss': exige justificativa mínima (>= 5 caracteres), remove arquivo físico do Storage primeiro e audita no banco.
+   - Ação 'quarantine-signed-url': gera signed URL temporária (60s) para inspeção antes de decisão.
+
+3. api/upload-briefing.ts
+   - Validação pré-stream de NEXAWEB_UPLOAD_TICKET_SECRET (HTTP 500 explicativo se ausente).
+   - Validação de ticket HMAC-SHA256 em tempo constante (timingSafeEqual).
+   - Descarte imediato de streams acima de 15 MiB sem sobrecarga de memória (stream.resume()).
+   - Verificação ativa de remoção física no Storage em falhas de upload antes de atualizar banco.
+   - Se remoção física falhar, grava 'DELETION_FAILED' (nunca 'DELETED' sem confirmação).
+
+4. api/create-briefing.ts
+   - Emissão de ticket temporário (15 min) vinculado ao projectId gerado.
+   - Diagnóstico claro se NEXAWEB_UPLOAD_TICKET_SECRET estiver ausente no servidor.
+
+5. api/cron-cleanup-attachments.ts
+   - Rotina Sweeper horária ('0 * * * *') com leases concorrentes de 120s via SKIP LOCKED.
+   - Incremento atômico preventivo no claim impedindo loops indefinidos mesmo se Storage e RPC falharem simultaneamente.
+   - Autenticação do Vercel Cron via Authorization: Bearer <CRON_SECRET> com timingSafeEqual.
+   - Proteção estrita contra CSRF: método GET requer CRON_SECRET (bloqueia links/tags externas).
+   - Disparo manual pelo administrador requer POST com cabeçalhos seguros (Sec-Fetch-Site / X-Requested-With).
+   - Retorna métrica 'quarantined' e suporta ?action=quarantine para inspeção segura.
+
+6. api/_session.ts
+   - Utilitário de autenticação e validação de sessão administrativa com cookie HMAC.
+
+7. api/_portal-session.ts
+   - Utilitário de hashing e validação de tokens da Área do Cliente.
+
+8. src/components/ContactModal.tsx
+   - Formulário de briefing do cliente: recebe uploadTicket e repassa via cabeçalho 'x-nexaweb-upload-ticket'.
+
+9. src/components/AdminDashboard.tsx
+   - Upload de portfólio no bucket público permanente 'nexaweb-public'.
+   - Visualização de briefings via URLs assinadas de 'nexaweb-vault' (60s).
+   - Interface de execução manual do Sweeper com cabeçalhos anti-CSRF e visualização da quarentena.
+   - Botões integrados na quarentena: 'Reenfileirar' (Retry) e 'Dispensar' (Dismiss com prompt de justificativa).
+
+10. vercel.json
+    - Agendamento do Vercel Cron para '/api/cron-cleanup-attachments' a cada hora ('0 * * * *').
+    - Regras de roteamento e cabeçalhos de segurança 'no-store' para rotas /api/*.
+
+11. .env.example
+    - Documentação de todas as variáveis de ambiente necessárias sem exposição de segredos.
+
+12. README-INTEGRACAO.md
+    - Guia detalhado passo a passo de implantação em staging e checklist de testes reais.
+
+13. tests/cron-sweeper-simulation.test.mjs
+    - Suíte de 27 testes unitários simulados em memória cobrindo todos os cenários críticos (concorrência, falha dupla, leases, quarentena e expurgo auditado).
+
+14. tests/test-upload-suite.mjs
+    - Suíte de 22 testes de validação do handler de upload (/api/upload-briefing.ts), garantindo integridade de ticket HMAC, bloqueio de tamanho, limites de quota e rollback de reservas.
+
+15. tests/test-e2e-handler.mjs
+    - Suíte de validação dos handlers serverless e Vercel Cron, garantindo autenticação Bearer com tempo constante, mitigação de falhas em RPCs e compatibilidade dos fluxos.
+
+--------------------------------------------------------------------------------
+2. RESUMO DE CONFORMIDADE DOS REQUISITOS DE SEGURANÇA
+--------------------------------------------------------------------------------
+[✓] 1. Falha dupla resolvida via incremento atômico de cleanup_attempts durante o claim.
+[✓] 2. Prevenção de loop infinito: nenhuma nova reivindicação com contador >= 10.
+[✓] 3. Tentativa reivindicada com contador em 10 pode concluir com sucesso para DELETED.
+[✓] 4. Eliminação de leases nulos em confirmações de sucesso e falha (exigência estrita de token e expiração futura).
+[✓] 5. Diferenciação de erros de lease: LEASE_EXPIRED (worker atrasado) vs LEASE_MISMATCH (posse transferida).
+[✓] 6. Recuperação administrativa com autenticação, CSRF seguro, validação de quarentena real e bloqueio de lease ativo.
+[✓] 7. Dismiss com tentativa prévia de remoção física no Storage e rastreabilidade com justificativa obrigatória.
+[✓] 8. Isolamento do bucket 'nexaweb-vault' com URLs assinadas restritas ao TTL de 60 segundos.
+[✓] 9. 9 RPCs sincronizadas entre SQL, endpoints e frontend restritas a 'service_role'.
+[✓] 10. Frequência horária do cron ('0 * * * *') documentada e refletida no vercel.json.
+
+--------------------------------------------------------------------------------
+3. LIMITAÇÕES E DIRETRIZES PARA PROMOÇÃO A PRODUÇÃO
+--------------------------------------------------------------------------------
+* Todas as validações automatizadas foram executadas exclusivamente em ambiente
+  simulado em memória (Mocks e testes unitários).
+* A integração NÃO deve ser considerada pronta para produção sem execução prévia
+  em ambiente de Staging com instâncias reais do Supabase e da Vercel.
+* Nenhuma consulta SQL real foi executada contra instâncias de banco de dados,
+  nenhum deploy foi acionado e nenhuma alteração foi enviada ao GitHub.
+================================================================================

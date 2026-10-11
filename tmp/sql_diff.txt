@@ -1,0 +1,304 @@
+--- original
++++ proposto
+@@ -100,12 +100,16 @@
+   cleanup_lease_token uuid,
+   cleanup_lease_expires_at timestamptz,
+   last_cleanup_error text,
++  quarantine_notes text,
++  quarantine_resolved_at timestamptz,
+   created_at timestamptz not null default now(),
+   updated_at timestamptz not null default now()
+ );
+ 
+ -- Garante idempotência: remove NOT NULL caso a tabela tenha sido criada em versão anterior
+ alter table public.project_attachments alter column reservation_expires_at drop not null;
++alter table public.project_attachments add column if not exists quarantine_notes text;
++alter table public.project_attachments add column if not exists quarantine_resolved_at timestamptz;
+ 
+ create index if not exists project_attachments_project_state_idx
+   on public.project_attachments(project_id, state);
+@@ -252,6 +256,8 @@
+ -- ------------------------------------------------------------------------------
+ 
+ -- 4.1 Reivindicação concorrente e segura de lotes para limpeza com SKIP LOCKED
++-- Incrementa atomicamente 'cleanup_attempts' durante a reivindicação para impedir loops indefinidos
++-- Limite estrito de 10 tentativas: nenhuma nova reivindicação quando o contador já estiver em 10
+ create or replace function public.claim_attachments_for_cleanup(
+   p_batch_size integer default 20,
+   p_lease_seconds integer default 120
+@@ -276,7 +282,7 @@
+        or state in ('DELETING', 'DELETION_FAILED')
+      )
+      and (cleanup_lease_expires_at is null or cleanup_lease_expires_at < now())
+-     and cleanup_attempts < 10
++     and cleanup_attempts < 10 -- Impede novas reivindicações quando já em 10 tentativas
+      order by created_at asc
+      limit coalesce(p_batch_size, 20)
+      for update skip locked
+@@ -284,6 +290,7 @@
+   update public.project_attachments a
+      set cleanup_lease_token = v_lease_token,
+          cleanup_lease_expires_at = v_lease_expiry,
++         cleanup_attempts = a.cleanup_attempts + 1, -- Incremento atômico preventivo no claim
+          state = 'DELETING',
+          updated_at = now()
+     from candidates c
+@@ -293,31 +300,60 @@
+ $$;
+ 
+ -- 4.2 Confirmação definitiva de exclusão física no Storage vinculada ao lease ativo e válido
++-- Elimina aceitação de lease nulo, exige token correspondente e diferencia expiração de divergência
+ create or replace function public.confirm_attachment_deleted(
+   p_attachment_id uuid,
+   p_lease_token uuid
+ ) returns jsonb
+ language plpgsql security definer set search_path = public, pg_temp
+ as $$
+-begin
++declare
++  v_current_token uuid;
++  v_current_expiry timestamptz;
++begin
++  if p_lease_token is null then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_TOKEN_REQUIRED');
++  end if;
++
+   update public.project_attachments
+      set state = 'DELETED',
+          cleanup_lease_token = null,
+          cleanup_lease_expires_at = null,
+          updated_at = now()
+    where id = p_attachment_id
++     and cleanup_lease_token is not null
+      and cleanup_lease_token = p_lease_token
+-     and (cleanup_lease_expires_at is null or cleanup_lease_expires_at > now());
++     and cleanup_lease_expires_at is not null
++     and cleanup_lease_expires_at > now();
+ 
+   if found then
+     return jsonb_build_object('ok', true);
+-  else
+-    return jsonb_build_object('ok', false, 'reason', 'LEASE_MISMATCH_OR_EXPIRED');
+-  end if;
++  end if;
++
++  -- Diagnóstico preciso de rejeição para telemetria sem expor dados sensíveis
++  select cleanup_lease_token, cleanup_lease_expires_at
++    into v_current_token, v_current_expiry
++    from public.project_attachments
++   where id = p_attachment_id;
++
++  if not found then
++    return jsonb_build_object('ok', false, 'reason', 'ATTACHMENT_NOT_FOUND');
++  end if;
++
++  if v_current_token is null or v_current_expiry is null then
++    return jsonb_build_object('ok', false, 'reason', 'NO_ACTIVE_LEASE');
++  end if;
++
++  if v_current_token = p_lease_token and v_current_expiry <= now() then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_EXPIRED');
++  end if;
++
++  return jsonb_build_object('ok', false, 'reason', 'LEASE_MISMATCH');
+ end;
+ $$;
+ 
+ -- 4.3 Registro de falha na exclusão física do Storage vinculado ao lease ativo e válido
++-- Não duplica o incremento (já realizado no claim) e elimina aceitação de lease nulo
+ create or replace function public.record_attachment_cleanup_failure(
+   p_attachment_id uuid,
+   p_lease_token uuid,
+@@ -326,29 +362,54 @@
+ language plpgsql security definer set search_path = public, pg_temp
+ as $$
+ declare
+-  v_new_attempts integer;
+-begin
++  v_attempts integer;
++  v_current_token uuid;
++  v_current_expiry timestamptz;
++begin
++  if p_lease_token is null then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_TOKEN_REQUIRED');
++  end if;
++
+   update public.project_attachments
+      set state = 'DELETION_FAILED',
+-         cleanup_attempts = cleanup_attempts + 1,
+          last_cleanup_error = p_error,
+          cleanup_lease_token = null,
+          cleanup_lease_expires_at = null,
+          updated_at = now()
+    where id = p_attachment_id
++     and cleanup_lease_token is not null
+      and cleanup_lease_token = p_lease_token
+-     and (cleanup_lease_expires_at is null or cleanup_lease_expires_at > now())
+-   returning cleanup_attempts into v_new_attempts;
++     and cleanup_lease_expires_at is not null
++     and cleanup_lease_expires_at > now()
++   returning cleanup_attempts into v_attempts;
+ 
+   if found then
+     return jsonb_build_object(
+       'ok', true,
+-      'cleanup_attempts', v_new_attempts,
+-      'quarantined', (v_new_attempts >= 10)
++      'cleanup_attempts', v_attempts,
++      'quarantined', (v_attempts >= 10)
+     );
+-  else
+-    return jsonb_build_object('ok', false, 'reason', 'LEASE_MISMATCH_OR_EXPIRED');
+-  end if;
++  end if;
++
++  -- Diagnóstico preciso de rejeição
++  select cleanup_lease_token, cleanup_lease_expires_at
++    into v_current_token, v_current_expiry
++    from public.project_attachments
++   where id = p_attachment_id;
++
++  if not found then
++    return jsonb_build_object('ok', false, 'reason', 'ATTACHMENT_NOT_FOUND');
++  end if;
++
++  if v_current_token is null or v_current_expiry is null then
++    return jsonb_build_object('ok', false, 'reason', 'NO_ACTIVE_LEASE');
++  end if;
++
++  if v_current_token = p_lease_token and v_current_expiry <= now() then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_EXPIRED');
++  end if;
++
++  return jsonb_build_object('ok', false, 'reason', 'LEASE_MISMATCH');
+ end;
+ $$;
+ 
+@@ -365,18 +426,108 @@
+   state text,
+   cleanup_attempts integer,
+   last_cleanup_error text,
++  quarantine_notes text,
++  quarantine_resolved_at timestamptz,
+   created_at timestamptz,
+   updated_at timestamptz
+ )
+ language sql security definer set search_path = public, pg_temp
+ as $$
+   select id, project_id, storage_path, mime_type, size_bytes, state,
+-         cleanup_attempts, last_cleanup_error, created_at, updated_at
++         cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at,
++         created_at, updated_at
+     from public.project_attachments
+    where cleanup_attempts >= coalesce(p_min_attempts, 10)
+       or (state = 'DELETION_FAILED' and cleanup_attempts >= coalesce(p_min_attempts, 10))
+    order by updated_at desc
+    limit coalesce(p_limit, 50);
++$$;
++
++-- 4.5 Recuperação Administrativa: Reenfileirar item em quarentena (Retry)
++-- Reabilita o item preservando o histórico de erro e sem apagar o arquivo
++create or replace function public.admin_retry_quarantined_attachment(
++  p_attachment_id uuid
++) returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  v_rec record;
++begin
++  select id, cleanup_attempts, cleanup_lease_expires_at, state
++    into v_rec
++    from public.project_attachments
++   where id = p_attachment_id;
++
++  if not found then
++    return jsonb_build_object('ok', false, 'reason', 'ATTACHMENT_NOT_FOUND');
++  end if;
++
++  -- Apenas itens com histórico em quarentena (>= 10 tentativas)
++  if v_rec.cleanup_attempts < 10 then
++    return jsonb_build_object('ok', false, 'reason', 'NOT_IN_QUARANTINE', 'attempts', v_rec.cleanup_attempts);
++  end if;
++
++  -- Impede retry enquanto outro worker mantiver lease ativo
++  if v_rec.cleanup_lease_expires_at is not null and v_rec.cleanup_lease_expires_at > now() then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_ACTIVE');
++  end if;
++
++  update public.project_attachments
++     set cleanup_attempts = 0,
++         cleanup_lease_token = null,
++         cleanup_lease_expires_at = null,
++         state = 'DELETING',
++         quarantine_notes = coalesce(quarantine_notes, '') || ' [RETRY acionado manualmente por admin em ' || now()::text || ']',
++         updated_at = now()
++   where id = p_attachment_id;
++
++  return jsonb_build_object('ok', true, 'status', 'QUEUED_FOR_RETRY');
++end;
++$$;
++
++-- 4.6 Recuperação Administrativa: Expurgo Justificado de item em quarentena (Dismiss)
++-- Exige justificativa mínima auditável e confirmação prévia no Storage pelo chamador
++create or replace function public.admin_dismiss_quarantined_attachment(
++  p_attachment_id uuid,
++  p_justification text
++) returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  v_rec record;
++begin
++  if p_justification is null or length(trim(p_justification)) < 5 then
++    return jsonb_build_object('ok', false, 'reason', 'JUSTIFICATION_REQUIRED');
++  end if;
++
++  select id, cleanup_attempts, cleanup_lease_expires_at, state, storage_path
++    into v_rec
++    from public.project_attachments
++   where id = p_attachment_id;
++
++  if not found then
++    return jsonb_build_object('ok', false, 'reason', 'ATTACHMENT_NOT_FOUND');
++  end if;
++
++  if v_rec.cleanup_attempts < 10 then
++    return jsonb_build_object('ok', false, 'reason', 'NOT_IN_QUARANTINE', 'attempts', v_rec.cleanup_attempts);
++  end if;
++
++  if v_rec.cleanup_lease_expires_at is not null and v_rec.cleanup_lease_expires_at > now() then
++    return jsonb_build_object('ok', false, 'reason', 'LEASE_ACTIVE');
++  end if;
++
++  update public.project_attachments
++     set state = 'DELETED',
++         cleanup_lease_token = null,
++         cleanup_lease_expires_at = null,
++         quarantine_notes = 'DISMISSED: ' || trim(p_justification),
++         quarantine_resolved_at = now(),
++         updated_at = now()
++   where id = p_attachment_id;
++
++  return jsonb_build_object('ok', true, 'status', 'DISMISSED');
++end;
+ $$;
+ 
+ -- ------------------------------------------------------------------------------
+@@ -390,6 +541,8 @@
+ revoke all on function public.confirm_attachment_deleted(uuid, uuid) from public, anon, authenticated;
+ revoke all on function public.record_attachment_cleanup_failure(uuid, uuid, text) from public, anon, authenticated;
+ revoke all on function public.get_quarantined_attachments(integer, integer) from public, anon, authenticated;
++revoke all on function public.admin_retry_quarantined_attachment(uuid) from public, anon, authenticated;
++revoke all on function public.admin_dismiss_quarantined_attachment(uuid, text) from public, anon, authenticated;
+ 
+ grant execute on function public.reserve_project_attachment(uuid, text, text, bigint) to service_role;
+ grant execute on function public.finish_project_attachment(uuid) to service_role;
+@@ -398,6 +551,8 @@
+ grant execute on function public.confirm_attachment_deleted(uuid, uuid) to service_role;
+ grant execute on function public.record_attachment_cleanup_failure(uuid, uuid, text) to service_role;
+ grant execute on function public.get_quarantined_attachments(integer, integer) to service_role;
++grant execute on function public.admin_retry_quarantined_attachment(uuid) to service_role;
++grant execute on function public.admin_dismiss_quarantined_attachment(uuid, text) to service_role;
+ 
+ commit;
+ 

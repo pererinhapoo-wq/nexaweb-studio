@@ -338,6 +338,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleQuarantineRetry = async (attachmentId: string) => {
+    try {
+      const res = await fetch('/api/admin-projects?action=quarantine-retry', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-action': 'quarantine-retry',
+        },
+        body: JSON.stringify({ attachmentId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Anexo reenfileirado para nova tentativa de limpeza.');
+        await handleFetchQuarantine();
+      } else {
+        alert(data.error || 'Falha ao reenfileirar anexo.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro de rede ao reenfileirar anexo.');
+    }
+  };
+
+  const handleQuarantineDismiss = async (attachmentId: string) => {
+    const justification = window.prompt(
+      'Informe a justificativa de auditoria para dispensar o anexo (mínimo 5 caracteres):'
+    );
+    if (!justification || justification.trim().length < 5) {
+      if (justification !== null) {
+        alert('Justificativa obrigatória (mínimo de 5 caracteres). Ação cancelada.');
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin-projects?action=quarantine-dismiss', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-action': 'quarantine-dismiss',
+        },
+        body: JSON.stringify({ attachmentId, justification: justification.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Anexo dispensado com sucesso e justificativa registrada.');
+        await handleFetchQuarantine();
+      } else {
+        alert(data.error || 'Falha ao dispensar anexo.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro de rede ao dispensar anexo.');
+    }
+  };
+
   // Busca e sincroniza arquivos do briefing selecionado
   useEffect(() => {
     // Limpa imediatamente o estado ao alternar ou carregar briefing para evitar manter arquivos anteriores
@@ -2465,16 +2521,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </span>
                   <div className="max-h-48 overflow-y-auto space-y-1.5">
                     {quarantinedFiles.map((q: any) => (
-                      <div key={q.id} className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] flex items-center justify-between">
+                      <div key={q.id} className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="min-w-0 pr-2">
                           <div className="font-mono text-neutral-300 truncate">{q.storage_path}</div>
                           <div className="text-neutral-500 text-[10px]">
                             Tentativas: {q.cleanup_attempts} | Erro: {q.last_cleanup_error || 'Desconhecido'}
                           </div>
+                          {q.quarantine_notes && (
+                            <div className="text-amber-400/80 text-[10px] truncate">
+                              Auditoria: {q.quarantine_notes}
+                            </div>
+                          )}
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 shrink-0">
-                          {q.state}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800">
+                            {q.state}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuarantineRetry(q.id)}
+                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                            title="Reenfileirar para nova tentativa com histórico preservado"
+                          >
+                            Reenfileirar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuarantineDismiss(q.id)}
+                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 transition-colors cursor-pointer"
+                            title="Dispensar com justificativa auditável após exclusão física"
+                          >
+                            Dispensar
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
