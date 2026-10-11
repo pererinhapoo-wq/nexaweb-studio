@@ -229,20 +229,36 @@ export default async function handler(req: any, res: any) {
       if (listingError) {
         failed++;
         console.error('CRON_STORAGE_LISTING_FAILED', { storage_path, error: listingError });
-        const { data: failListingData } = await supabase.rpc('record_attachment_cleanup_failure', {
+        const { data: failListingData, error: failListingRpcError } = await supabase.rpc('record_attachment_cleanup_failure', {
           p_attachment_id: attachment_id,
           p_lease_token: lease_token,
           p_error: `FALHA_LISTAGEM_STORAGE: ${listingError}`,
         });
-        results.push({
-          id: attachment_id,
-          storage_path,
-          status: 'DELETION_FAILED',
-          error: `Falha na verificação de existência no Storage: ${listingError}`,
-          quarantined: (cleanup_attempts >= 10),
-          is_paused: Boolean(failListingData?.is_paused),
-          dismiss_failure_count: failListingData?.dismiss_failure_count,
-        });
+
+        const isQuarantined = Boolean(failListingData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
+
+        if (failListingRpcError || !failListingData?.ok) {
+          const failReason = failListingRpcError?.message || failListingData?.reason || 'Falha na RPC de registro de erro';
+          console.error('CRON_RECORD_FAILURE_RPC_FAILED', { storage_path, error: failReason });
+
+          results.push({
+            id: attachment_id,
+            storage_path,
+            status: 'DELETION_FAILED_UNRECORDED',
+            error: `Falha na verificação de existência no Storage (${listingError}), e o registro de falha no banco não foi concluído (${failReason}).`,
+            quarantined: isQuarantined,
+          });
+        } else {
+          results.push({
+            id: attachment_id,
+            storage_path,
+            status: 'DELETION_FAILED',
+            error: `Falha na verificação de existência no Storage: ${listingError}`,
+            quarantined: isQuarantined,
+            is_paused: Boolean(failListingData?.is_paused),
+            dismiss_failure_count: failListingData?.dismiss_failure_count,
+          });
+        }
         continue;
       }
 

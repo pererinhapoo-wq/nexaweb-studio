@@ -33,9 +33,9 @@ Este documento descreve as correções pontuais implementadas na versão **V4.1*
   - Permite atualizar ou manter a justificativa auditada e preserva `cleanup_attempts`.
   - Integrada à rota `/api/admin-projects?action=quarantine-reauthorize` e ao painel `AdminDashboard.tsx` com botão dedicado de **Reautorizar**.
 
-### 1.4 Diferenciação Estrita de Falhas no Cron e Sweeper
-* **Falha ao Listar o Storage (`storage.list`):** Não presume que o arquivo existe nem que foi removido. Registra a falha técnica via `record_attachment_cleanup_failure` sem chamar confirmação e mantém o anexo recuperável.
-* **Falha ao Remover o Arquivo (`storage.remove`):** Contabiliza falha física no `dismiss_failure_count`, pausa se atingir o limite e preserva o histórico.
+### 1.4 Diferenciação Estrita de Falhas no Cron e Sweeper (Revisão V4.1 Corrigida)
+* **Falha ao Listar o Storage (`storage.list`):** Não presume que o arquivo existe nem que foi removido. Registra a falha técnica via `record_attachment_cleanup_failure` sem chamar confirmação e mantém o anexo recuperável. Caso a própria RPC falhe ou o lease esteja expirado, o sistema emite o log `CRON_RECORD_FAILURE_RPC_FAILED` e classifica o item como `DELETION_FAILED_UNRECORDED`, prevenindo falso positivo de gravação no banco.
+* **Falha ao Remover o Arquivo (`storage.remove`):** Contabiliza falha física no `dismiss_failure_count`, pausa se atingir o limite e preserva o histórico. No descarte administrativo, caso o registro da falha no banco falhe, o log `ADMIN_DISMISS_RECORD_FAILURE_RPC_FAILED` é emitido e a resposta distingue com precisão a falha física no Storage da falha no registro de auditoria no banco.
 * **Arquivo Já Ausente do Storage (`!fileExists`):** Detecta que o arquivo já foi excluído em ciclo anterior e **não reexecuta** `storage.remove`. Prossegue diretamente para a confirmação atômica no banco usando o lease ativo.
 * **Falha de Confirmação no Banco:** Se a remoção física tiver ocorrido mas a confirmação no banco falhar, o anexo **não é marcado como DELETED**. Permanece em quarentena com `pending_dismiss_justification` para reconciliação segura no ciclo seguinte sem nova exclusão física.
 
@@ -49,21 +49,21 @@ Este documento descreve as correções pontuais implementadas na versão **V4.1*
 | `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | **Preservado** | Migração V3 original intacta. |
 | `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | **Preservado** | Migração V4 original intacta. |
 | `MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql` | **Novo (V4.1)** | Migração revisada com limite finito de retentativas, pausa de descarte e reautorização administrativa. |
-| `api/admin-projects.ts` | `api/admin-projects.ts` | **Atualizado** | Endpoint com ação `quarantine-reauthorize`, suporte CSRF e fallback sincronizado. |
-| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Atualizado** | Sweeper com diferenciação de erros, exclusão de itens pausados e reporte de `is_paused`. |
+| `api/admin-projects.ts` | `api/admin-projects.ts` | **Atualizado (V4.1 Corrigida)** | Endpoint com ação `quarantine-reauthorize`, tratamento de falha dupla no descarte e auditoria segura. |
+| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Atualizado (V4.1 Corrigida)** | Sweeper com tratamento rigoroso de falha ao registrar erros de listagem (`DELETION_FAILED_UNRECORDED`). |
 | `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Atualizado** | Exibição de status de pausa, motivo da falha e botão de reautorização administrativa. |
 | `src/components/ContactModal.tsx` | `src/components/ContactModal.tsx` | **Preservado** | Formulário de contato acessível. |
 | `api/create-briefing.ts` | `api/create-briefing.ts` | **Preservado** | Geração segura de tickets HMAC. |
 | `api/upload-briefing.ts` | `api/upload-briefing.ts` | **Preservado** | Validação binária e cotas de briefing. |
 | `api/_session.ts` | `api/_session.ts` | **Preservado** | Sessão de cliente assinada via HMAC. |
 | `api/_portal-session.ts` | `api/_portal-session.ts` | **Preservado** | Sessão do portal com cookies seguros. |
-| `tests/quarantine-security-regression.test.mjs` | `tests/quarantine-security-regression.test.mjs` | **Atualizado (V4.1)** | Suíte com 52 testes cobrindo os 10 cenários obrigatórios da V4.1. |
-| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Atualizado (V4.1)** | Suíte completa com 71 testes simulados do ciclo de vida e permissões. |
+| `tests/quarantine-security-regression.test.mjs` | `tests/quarantine-security-regression.test.mjs` | **Atualizado (V4.1 Corrigida)** | Suíte com 65 testes cobrindo os 12 cenários de regressão e falhas de RPC. |
+| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Atualizado (V4.1 Corrigida)** | Suíte com 84 testes simulados de ciclo de vida, permissões e falhas de RPC. |
 | `tests/test-upload-suite.mjs` | `tests/test-upload-suite.mjs` | **Existente** | Suíte de upload de briefings (22 testes). |
 | `tests/test-e2e-handler.mjs` | `tests/test-e2e-handler.mjs` | **Existente** | Testes ponta a ponta dos handlers serverless. |
 | `vercel.json` | `vercel.json` | **Preservado** | Configurações de rotas e cron triggers. |
-| `README-INTEGRACAO.md` | `README-INTEGRACAO.md` | **Atualizado** | Guia técnico e relatório de validação da V4.1. |
-| `MANIFESTO-ENTREGA.txt` | `MANIFESTO-ENTREGA.txt` | **Atualizado** | Manifesto com hashes SHA-256 e tamanhos exatos. |
+| `README-INTEGRACAO.md` | `README-INTEGRACAO.md` | **Atualizado** | Guia técnico e relatório de validação da V4.1 Corrigida. |
+| `MANIFESTO-ENTREGA.txt` | `MANIFESTO-ENTREGA.txt` | **Atualizado** | Manifesto com hashes SHA-256 e tamanhos exatos em tempo real. |
 
 ---
 
@@ -72,7 +72,7 @@ Este documento descreve as correções pontuais implementadas na versão **V4.1*
 Todas as suítes foram executadas no ambiente local e aprovadas com código de saída 0:
 
 1. **Suíte de Regressão V4.1 (`tests/quarantine-security-regression.test.mjs`):**
-   - **52 testes executados / 52 aprovados (100% de sucesso)**
+   - **65 testes executados / 65 aprovados (100% de sucesso)**
    - Cenários obrigatórios validados:
      - Falhas repetidas de remoção até atingir o limite de 5 tentativas.
      - Confirmação de que o Cron deixa de repetir a operação física após o limite.
@@ -84,9 +84,11 @@ Todas as suítes foram executadas no ambiente local e aprovadas com código de s
      - Rejeição estrita de tokens antigos (`LEASE_MISMATCH`) e leases expirados (`LEASE_EXPIRED`).
      - Concorrência atômica entre múltiplos workers (`LEASE_ACTIVE`).
      - Garantia de que registros resolvidos (`DELETED`) não voltam à fila nem aceitam novas mutações.
+     - Falhas na RPC `record_attachment_cleanup_failure` durante listagem (`DELETION_FAILED_UNRECORDED`).
+     - Falhas na RPC `record_attachment_cleanup_failure` durante descarte administrativo.
 
 2. **Suíte do Sweeper e RPCs (`tests/cron-sweeper-simulation.test.mjs`):**
-   - **71 testes executados / 71 aprovados (100% de sucesso)**
+   - **84 testes executados / 84 aprovados (100% de sucesso)**
 
 3. **Suíte de Upload de Briefings (`tests/test-upload-suite.mjs`):**
    - **22 testes executados / 22 aprovados (100% de sucesso)**
@@ -95,7 +97,7 @@ Todas as suítes foram executadas no ambiente local e aprovadas com código de s
    - **0 erros de tipagem (Código 0)**
 
 5. **Build de Produção (`npm run build`):**
-   - **Compilação concluída com sucesso em 1.09s**
+   - **Compilação concluída com sucesso**
 
 ---
 

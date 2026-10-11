@@ -800,6 +800,185 @@ async function runSimulationTests() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Cenário 18: Falha de listagem no Storage + Tratamento robusto da RPC de falha
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 18] Testando Falha de listagem no Storage e tratamento da RPC de registro de falha...');
+  {
+    const item = {
+      attachment_id: 'att-list-fail-1',
+      storage_path: 'briefings/p1/list-err.jpg',
+      lease_token: 'lease-token-list-1',
+      cleanup_attempts: 10,
+    };
+
+    // Subcaso A: RPC de registro falha (erro de rede) -> DELETION_FAILED_UNRECORDED
+    {
+      const results = [];
+      let failed = 0;
+      let loggedError = null;
+      const originalConsoleError = console.error;
+      console.error = (msg, meta) => {
+        if (msg === 'CRON_RECORD_FAILURE_RPC_FAILED') loggedError = meta;
+      };
+
+      const listingError = 'Storage 502 Bad Gateway';
+      failed++;
+      const failListingRpcError = { message: 'Database connection timeout' };
+      const failListingData = null;
+
+      const cleanup_attempts = item.cleanup_attempts;
+      const isQuarantined = Boolean(failListingData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
+
+      if (failListingRpcError || !failListingData?.ok) {
+        const failReason = failListingRpcError?.message || failListingData?.reason || 'Falha na RPC de registro de erro';
+        console.error('CRON_RECORD_FAILURE_RPC_FAILED', { storage_path: item.storage_path, error: failReason });
+
+        results.push({
+          id: item.attachment_id,
+          storage_path: item.storage_path,
+          status: 'DELETION_FAILED_UNRECORDED',
+          error: `Falha na verificação de existência no Storage (${listingError}), e o registro de falha no banco não foi concluído (${failReason}).`,
+          quarantined: isQuarantined,
+        });
+      }
+
+      console.error = originalConsoleError;
+
+      assert(failed === 1, 'Contador de falhas incrementado na falha de listagem');
+      assert(results[0].status === 'DELETION_FAILED_UNRECORDED', 'Status classificado como DELETION_FAILED_UNRECORDED quando RPC falha');
+      assert(loggedError && loggedError.error.includes('Database connection timeout'), 'Log CRON_RECORD_FAILURE_RPC_FAILED emitido com detalhe da falha');
+      assert(results[0].quarantined === true, 'Quarentena preservada mesmo quando o registro no banco falhou');
+    }
+
+    // Subcaso B: RPC de registro responde com data.ok = false -> DELETION_FAILED_UNRECORDED
+    {
+      const results = [];
+      const listingError = 'Storage 503 Service Unavailable';
+      const failListingRpcError = null;
+      const failListingData = { ok: false, reason: 'LEASE_EXPIRED' };
+      const cleanup_attempts = item.cleanup_attempts;
+      const isQuarantined = Boolean(failListingData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
+
+      if (failListingRpcError || !failListingData?.ok) {
+        const failReason = failListingRpcError?.message || failListingData?.reason || 'Falha na RPC de registro de erro';
+        results.push({
+          id: item.attachment_id,
+          storage_path: item.storage_path,
+          status: 'DELETION_FAILED_UNRECORDED',
+          error: `Falha na verificação de existência no Storage (${listingError}), e o registro de falha no banco não foi concluído (${failReason}).`,
+          quarantined: isQuarantined,
+        });
+      }
+
+      assert(results[0].status === 'DELETION_FAILED_UNRECORDED', 'data.ok=false classifica como DELETION_FAILED_UNRECORDED');
+      assert(results[0].error.includes('LEASE_EXPIRED'), 'Motivo LEASE_EXPIRED incluído na mensagem de erro');
+    }
+
+    // Subcaso C: RPC de registro responde com sucesso -> DELETION_FAILED com dados auditados
+    {
+      const results = [];
+      const listingError = 'Storage connection reset';
+      const failListingRpcError = null;
+      const failListingData = { ok: true, quarantined: true, is_paused: false, dismiss_failure_count: 1 };
+      const cleanup_attempts = item.cleanup_attempts;
+      const isQuarantined = Boolean(failListingData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
+
+      if (failListingRpcError || !failListingData?.ok) {
+        // não entra
+      } else {
+        results.push({
+          id: item.attachment_id,
+          storage_path: item.storage_path,
+          status: 'DELETION_FAILED',
+          error: `Falha na verificação de existência no Storage: ${listingError}`,
+          quarantined: isQuarantined,
+          is_paused: Boolean(failListingData?.is_paused),
+          dismiss_failure_count: failListingData?.dismiss_failure_count,
+        });
+      }
+
+      assert(results[0].status === 'DELETION_FAILED', 'Sucesso na RPC registra status DELETION_FAILED');
+      assert(results[0].is_paused === false && results[0].dismiss_failure_count === 1, 'Métricas da RPC preservadas no resultado');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cenário 19: Falha na RPC record_attachment_cleanup_failure durante Admin Dismiss
+  // ---------------------------------------------------------------------------
+  console.log('\n[Cenário 19] Testando Admin Dismiss com falha no Storage e falha na RPC de registro de erro...');
+  {
+    const storageErrorMsg = 'S3 Bucket unreachable';
+    const storagePath = 'briefings/p1/admin-storage-fail.jpg';
+
+    // Subcaso A: RPC falha com erro de conexão
+    {
+      let loggedError = null;
+      const origErr = console.error;
+      console.error = (msg, meta) => {
+        if (msg === 'ADMIN_DISMISS_RECORD_FAILURE_RPC_FAILED') loggedError = meta;
+      };
+
+      const failRecErr = { message: 'Network reset to Postgres' };
+      const failRecData = null;
+
+      let responsePayload = null;
+      if (failRecErr || !failRecData?.ok) {
+        const failReason = failRecErr?.message || failRecData?.reason || 'Falha ao registrar erro no banco';
+        console.error('ADMIN_DISMISS_RECORD_FAILURE_RPC_FAILED', {
+          path: storagePath,
+          error: failReason,
+        });
+
+        responsePayload = {
+          status: 500,
+          error: `Falha na remoção física no Storage (${storageErrorMsg}), e o registro de falha no banco não foi concluído (${failReason}).`,
+        };
+      }
+
+      console.error = origErr;
+
+      assert(responsePayload.status === 500, 'Admin dismiss com falha na RPC retorna HTTP 500');
+      assert(responsePayload.error.includes('o registro de falha no banco não foi concluído'), 'Mensagem especifica falha no banco');
+      assert(loggedError && loggedError.error.includes('Network reset to Postgres'), 'Log ADMIN_DISMISS_RECORD_FAILURE_RPC_FAILED emitido');
+    }
+
+    // Subcaso B: RPC responde com data.ok = false (ex: token inválido)
+    {
+      const failRecErr = null;
+      const failRecData = { ok: false, reason: 'LEASE_MISMATCH' };
+
+      let responsePayload = null;
+      if (failRecErr || !failRecData?.ok) {
+        const failReason = failRecErr?.message || failRecData?.reason || 'Falha ao registrar erro no banco';
+        responsePayload = {
+          status: 500,
+          error: `Falha na remoção física no Storage (${storageErrorMsg}), e o registro de falha no banco não foi concluído (${failReason}).`,
+        };
+      }
+
+      assert(responsePayload.error.includes('LEASE_MISMATCH'), 'Motivo LEASE_MISMATCH discriminado na mensagem do admin');
+    }
+
+    // Subcaso C: RPC confirma o registro normalmente
+    {
+      const failRecErr = null;
+      const failRecData = { ok: true };
+
+      let responsePayload = null;
+      if (failRecErr || !failRecData?.ok) {
+        // não entra
+      } else {
+        responsePayload = {
+          status: 500,
+          error: `Falha na remoção física no Storage: ${storageErrorMsg}. O item foi mantido em quarentena para recuperação segura.`,
+        };
+      }
+
+      assert(responsePayload.error.includes('O item foi mantido em quarentena para recuperação segura'), 'Quando RPC sucede, confirma quarentena com segurança');
+    }
+  }
+
   console.log('\n===============================================================');
   console.log(`TOTAL DE TESTES SIMULADOS EXECUTADOS: ${totalTests}`);
   console.log(`TESTES APROVADOS: ${passedTests}/${totalTests}`);

@@ -1,5 +1,5 @@
 ================================================================================
-MANIFESTO DE ENTREGA: NEXAWEB - LIMITE SEGURO DE RETENTATIVAS (V4.1)
+MANIFESTO DE ENTREGA: NEXAWEB - LIMITE SEGURO DE RETENTATIVAS (V4.1 CORRIGIDA)
 Data de Emissão: 2026-10-11
 Status: Validado e Aprovado nos Testes Automatizados Locais
 ================================================================================
@@ -10,29 +10,30 @@ MIGRACAO_UPLOADS_PENDENTE.sql                  |   15902 bytes | 36553c57fdadf16
 MIGRACAO_UPLOADS_QUARENTENA_V3.sql             |   12681 bytes | 77e3ea8d9ab76ae178dc6cb2d4b4fe2815a626bdf8208729a242af6a59fcb58b
 MIGRACAO_UPLOADS_QUARENTENA_V4.sql             |   20338 bytes | 1ea2b8d746daf6150edf994d2119d53e346abb1c4d8c09897c02b83ad525dce4
 MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql           |   26902 bytes | 91c63e6a846e443fe2520023cc0c75424adbe8b8381d4dc8f3a4ff18acc62580
-api/admin-projects.ts                          |   22014 bytes | 548645c39201393ccbd78181b0a8fa15ca00d6365cf837f72101fc2978005ef3
-api/cron-cleanup-attachments.ts                |   15129 bytes | dbe79d345bb2a72edca86937997e7d95ceb2028836f606060f428e00c5cbad73
+api/admin-projects.ts                          |   22645 bytes | a53c2ece201a824ef4915606c2ed1c16a69d2b3cf50df5158c2c68fe881d1de5
+api/cron-cleanup-attachments.ts                |   15954 bytes | f4925462c569e073ad22b93b562c6372356c9140dfbbcea90cafcffc5ee9fbf6
 api/create-briefing.ts                         |    5475 bytes | ed9671e2729c4144ce32a022dd35a3a7903047fe2d8b2a4193a04e5fc42d58e1
 api/upload-briefing.ts                         |   12979 bytes | 054484493895cac872031bbb4f9353c4a7420f9389b6763cf9d33733961888c5
 api/_session.ts                                |    7347 bytes | cf9be45e26b7aeea7b15c3c7889e9a592dd576df327b36d483ffd4f8d2711974
 api/_portal-session.ts                         |    4368 bytes | 505da6a6da5fded1ff8944dc9256f050608536a4c10c80c8603c4bbf327ee603
 src/components/AdminDashboard.tsx              |  196658 bytes | 2bb43eb869b0edf6cdb59839a4327b96eb1b3504896c46c4b8b8c077636aa4c2
 src/components/ContactModal.tsx                |  148277 bytes | 5ec83b3fed7474fd9a4a635d210c4bd8d18069427c7e82961da9d018abce5ec9
-tests/quarantine-security-regression.test.mjs  |   33870 bytes | 2019a0e8d14212d2131af749c3e7f0003f908e096c4d29da93a668b1ef40c0e2
-tests/cron-sweeper-simulation.test.mjs         |   39364 bytes | d7b0ad0221dde5af651789fcb02ec9f6e752f7f6e71816bada6dd9a0c4326ec5
+tests/quarantine-security-regression.test.mjs  |   45814 bytes | ba7cf0289abff3ad32945f28aa2faf45f663b39524c5e72945a41e582154a2d5
+tests/cron-sweeper-simulation.test.mjs         |   47521 bytes | 76b648841799d0d53e40a268d97fb39b44cb458aec572da87be16ea238e6ef64
 tests/test-upload-suite.mjs                    |   20093 bytes | fe2bff81190d1ab576f93da6865faaa29377201a400b846fc2db24c23a016e06
 tests/test-e2e-handler.mjs                     |   20788 bytes | a3220e59e50bb83bbb4ef2f06e020d8b3afab8ef40e8b29845db668121d7d302
 vercel.json                                    |    1562 bytes | cb60be56443f45403e24b6fb498fa3eecf27d53e8fb3f4280650101b1d0e6820
-README-INTEGRACAO.md                           |    9587 bytes | 66e824897bba9c0ba94551f7a08a3b091ba79706620eddee8f7ce54c17d500fd
+README-INTEGRACAO.md                           |   10374 bytes | 91c0fec6d2a64c59bc3946e03ccb515f0e4b9d94510342d6b655663dc8dc61df
 --------------------------------------------------------------------------------
 
 RESUMO DAS VERIFICAÇÕES EXECUTADAS:
-- tests/quarantine-security-regression.test.mjs: 52/52 APROVADOS (10 cenários obrigatórios V4.1)
-- tests/cron-sweeper-simulation.test.mjs: 71/71 APROVADOS (fluxo atômico, permissões e sweeper)
+- tests/quarantine-security-regression.test.mjs: 65/65 APROVADOS (12 cenários de quarentena e retentativas)
+- tests/cron-sweeper-simulation.test.mjs: 84/84 APROVADOS (fluxo atômico, permissões e sweeper)
 - tests/test-upload-suite.mjs: 22/22 APROVADOS (uploads e cotas)
+- tests/test-e2e-handler.mjs: TODOS OS TESTES PASSARAM (fluxos E2E e conflitos de bucket)
 - npx tsc --noEmit: 0 ERROS DE TIPAGEM (Código de saída 0)
-- npm run build: BUILD CONCLUÍDO COM SUCESSO (1.09s)
+- npm run build: BUILD CONCLUÍDO COM SUCESSO
 ================================================================================
 
-PACOTE FINAL ZIP: ENTREGA_UPLOADS_NEXAWEB_QUARENTENA_V4_1.zip
+PACOTE FINAL ZIP: ENTREGA_UPLOADS_NEXAWEB_QUARENTENA_V4_1_CORRIGIDA.zip
 ================================================================================

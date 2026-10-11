@@ -252,11 +252,26 @@ export default async function handler(req: any, res: any) {
             error: storageErrorMsg,
           });
 
-          await supabase.rpc('record_attachment_cleanup_failure', {
-            p_attachment_id: attachmentId,
-            p_lease_token: leaseToken,
-            p_error: `ADMIN_DISMISS_STORAGE_ERROR: ${storageErrorMsg}`,
-          });
+          const { data: failRecData, error: failRecErr } = await supabase.rpc(
+            'record_attachment_cleanup_failure',
+            {
+              p_attachment_id: attachmentId,
+              p_lease_token: leaseToken,
+              p_error: `ADMIN_DISMISS_STORAGE_ERROR: ${storageErrorMsg}`,
+            }
+          );
+
+          if (failRecErr || !failRecData?.ok) {
+            const failReason = failRecErr?.message || failRecData?.reason || 'Falha ao registrar erro no banco';
+            console.error('ADMIN_DISMISS_RECORD_FAILURE_RPC_FAILED', {
+              path: storagePath,
+              error: failReason,
+            });
+
+            return res.status(500).json({
+              error: `Falha na remoção física no Storage (${storageErrorMsg}), e o registro de falha no banco não foi concluído (${failReason}).`,
+            });
+          }
 
           return res.status(500).json({
             error: `Falha na remoção física no Storage: ${storageErrorMsg}. O item foi mantido em quarentena para recuperação segura.`,
