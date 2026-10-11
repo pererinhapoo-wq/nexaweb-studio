@@ -109,7 +109,7 @@ export default async function handler(req: any, res: any) {
       if (qErr) {
         const { data: fallbackList, error: fallbackErr } = await supabase
           .from('project_attachments')
-          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, created_at, updated_at')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, created_at, updated_at')
           .neq('state', 'DELETED')
           .is('quarantine_resolved_at', null)
           .gte('cleanup_attempts', 10)
@@ -190,15 +190,106 @@ export default async function handler(req: any, res: any) {
 
     // 4. Processa cada anexo reivindicado com confirmação estrita de remoção física e de transação no banco
     for (const item of items) {
-      const { attachment_id, storage_path, lease_token, cleanup_attempts } = item;
+      const {
+        attachment_id,
+        storage_path,
+        lease_token,
+        cleanup_attempts,
+        is_pending_dismiss,
+        dismiss_justification,
+      } = item;
 
-      // Remoção física no bucket privado nexaweb-vault
+      const isPendingDismiss = Boolean(is_pending_dismiss);
+      const justification = (dismiss_justification || 'Expurgo de quarentena recuperado via rotina de limpeza').trim();
+
+      // 4.1 Verificação prévia de existência no Storage (trata falha de listagem separadamente)
+      let fileExists = true;
+      let listingError: string | null = null;
+
+      try {
+        const lastSlashIndex = storage_path.lastIndexOf('/');
+        const folder = lastSlashIndex !== -1 ? storage_path.substring(0, lastSlashIndex) : '';
+        const fileName = lastSlashIndex !== -1 ? storage_path.substring(lastSlashIndex + 1) : storage_path;
+
+        const { data: listData, error: listErr } = await supabase.storage
+          .from('nexaweb-vault')
+          .list(folder, { search: fileName, limit: 1 });
+
+        if (listErr) {
+          listingError = listErr.message || 'Falha ao consultar listagem no Storage';
+        } else if (Array.isArray(listData)) {
+          fileExists = listData.some((obj) => obj.name === fileName);
+        }
+      } catch (listEx: any) {
+        listingError = listEx?.message || 'Exceção na consulta de listagem no Storage';
+      }
+
+      if (listingError) {
+        failed++;
+        console.error('CRON_STORAGE_LISTING_FAILED', { storage_path, error: listingError });
+        await supabase.rpc('record_attachment_cleanup_failure', {
+          p_attachment_id: attachment_id,
+          p_lease_token: lease_token,
+          p_error: `FALHA_LISTAGEM_STORAGE: ${listingError}`,
+        });
+        results.push({
+          id: attachment_id,
+          storage_path,
+          status: 'DELETION_FAILED',
+          error: `Falha na verificação de existência no Storage: ${listingError}`,
+          quarantined: (cleanup_attempts >= 10),
+        });
+        continue;
+      }
+
+      // 4.2 Se o arquivo já não existe no Storage (remoção anterior confirmada ou arquivo já expurgado)
+      if (!fileExists) {
+        console.log('CRON_FILE_ALREADY_REMOVED_RECOVERING', { storage_path, isPendingDismiss });
+
+        let confirmData: any = null;
+        let confirmError: any = null;
+
+        if (isPendingDismiss) {
+          const res = await supabase.rpc('admin_dismiss_quarantined_attachment', {
+            p_attachment_id: attachment_id,
+            p_justification: justification,
+            p_lease_token: lease_token,
+          });
+          confirmData = res.data;
+          confirmError = res.error;
+        } else {
+          const res = await supabase.rpc('confirm_attachment_deleted', {
+            p_attachment_id: attachment_id,
+            p_lease_token: lease_token,
+          });
+          confirmData = res.data;
+          confirmError = res.error;
+        }
+
+        if (confirmError || !confirmData?.ok) {
+          failed++;
+          const reason = confirmError?.message || confirmData?.reason || 'Falha na confirmação de recuperação no banco';
+          console.error('CRON_RECOVERY_CONFIRM_FAILED', { storage_path, error: reason });
+          results.push({
+            id: attachment_id,
+            storage_path,
+            status: 'CONFIRMATION_FAILED',
+            error: `Arquivo ausente do Storage, mas confirmação de recuperação no banco falhou: ${reason}`,
+            quarantined: (cleanup_attempts >= 10),
+          });
+        } else {
+          succeeded++;
+          results.push({ id: attachment_id, storage_path, status: 'DELETED' });
+        }
+        continue;
+      }
+
+      // 4.3 Se o arquivo ainda existe no Storage: executa a remoção física
       const { error: storageError } = await supabase.storage
         .from('nexaweb-vault')
         .remove([storage_path]);
 
       if (storageError) {
-        // Falha na remoção física: NUNCA marca como excluído! Grava como DELETION_FAILED
         failed++;
         const errorMessage = storageError.message || 'Falha ao remover arquivo do Storage';
         console.error('CRON_STORAGE_REMOVE_FAILED', { storage_path, error: errorMessage });
@@ -209,7 +300,6 @@ export default async function handler(req: any, res: any) {
           p_error: errorMessage,
         });
 
-        // Como o incremento atômico ocorre no claim, cleanup_attempts já reflete a tentativa corrente
         const isQuarantined = Boolean(failData?.quarantined || (typeof cleanup_attempts === 'number' && cleanup_attempts >= 10));
 
         if (failRpcError || !failData?.ok) {
@@ -232,28 +322,45 @@ export default async function handler(req: any, res: any) {
             quarantined: isQuarantined,
           });
         }
+        continue;
+      }
+
+      // 4.4 Remoção física confirmada: confirma no banco validando lease e intenção
+      let confirmData: any = null;
+      let confirmError: any = null;
+
+      if (isPendingDismiss) {
+        const res = await supabase.rpc('admin_dismiss_quarantined_attachment', {
+          p_attachment_id: attachment_id,
+          p_justification: justification,
+          p_lease_token: lease_token,
+        });
+        confirmData = res.data;
+        confirmError = res.error;
       } else {
-        // Remoção física confirmada no Storage: confirma no banco validando lease e resultado
-        const { data: confirmData, error: confirmError } = await supabase.rpc('confirm_attachment_deleted', {
+        const res = await supabase.rpc('confirm_attachment_deleted', {
           p_attachment_id: attachment_id,
           p_lease_token: lease_token,
         });
+        confirmData = res.data;
+        confirmError = res.error;
+      }
 
-        if (confirmError || !confirmData?.ok) {
-          failed++;
-          const reason = confirmError?.message || confirmData?.reason || 'Falha na confirmação da RPC de exclusão';
-          console.error('CRON_CONFIRM_RPC_FAILED', { storage_path, error: reason });
+      if (confirmError || !confirmData?.ok) {
+        failed++;
+        const reason = confirmError?.message || confirmData?.reason || 'Falha na confirmação da RPC de exclusão';
+        console.error('CRON_CONFIRM_RPC_FAILED', { storage_path, error: reason });
 
-          results.push({
-            id: attachment_id,
-            storage_path,
-            status: 'CONFIRMATION_FAILED',
-            error: `Removido do Storage, mas confirmação no banco falhou: ${reason}`,
-          });
-        } else {
-          succeeded++;
-          results.push({ id: attachment_id, storage_path, status: 'DELETED' });
-        }
+        results.push({
+          id: attachment_id,
+          storage_path,
+          status: 'CONFIRMATION_FAILED',
+          error: `Removido do Storage, mas confirmação no banco falhou: ${reason}`,
+          quarantined: (cleanup_attempts >= 10),
+        });
+      } else {
+        succeeded++;
+        results.push({ id: attachment_id, storage_path, status: 'DELETED' });
       }
     }
 

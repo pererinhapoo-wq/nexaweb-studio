@@ -206,20 +206,42 @@ export default async function handler(req: any, res: any) {
         const storagePath = claimRes.storage_path;
 
         // FASE 2: Remoção física no Storage (somente executada após claim validado no banco)
+        // Trata com segurança o caso em que o arquivo já foi removido em tentativa anterior
+        let fileExists = true;
+        try {
+          const lastSlash = storagePath.lastIndexOf('/');
+          const folder = lastSlash !== -1 ? storagePath.substring(0, lastSlash) : '';
+          const fileName = lastSlash !== -1 ? storagePath.substring(lastSlash + 1) : storagePath;
+          const { data: listData, error: listErr } = await supabase.storage
+            .from('nexaweb-vault')
+            .list(folder, { search: fileName, limit: 1 });
+          if (!listErr && Array.isArray(listData)) {
+            fileExists = listData.some((obj) => obj.name === fileName);
+          }
+        } catch {
+          fileExists = true;
+        }
+
         let storageRemoved = false;
         let storageErrorMsg: string | null = null;
-        try {
-          const { error: removeErr } = await supabase.storage
-            .from('nexaweb-vault')
-            .remove([storagePath]);
 
-          if (removeErr) {
-            storageErrorMsg = removeErr.message;
-          } else {
-            storageRemoved = true;
+        if (!fileExists) {
+          // Arquivo já não existe no Storage: prossegue com segurança para confirmação
+          storageRemoved = true;
+        } else {
+          try {
+            const { error: removeErr } = await supabase.storage
+              .from('nexaweb-vault')
+              .remove([storagePath]);
+
+            if (removeErr) {
+              storageErrorMsg = removeErr.message;
+            } else {
+              storageRemoved = true;
+            }
+          } catch (storageEx: any) {
+            storageErrorMsg = storageEx?.message || 'Exceção na remoção do Storage';
           }
-        } catch (storageEx: any) {
-          storageErrorMsg = storageEx?.message || 'Exceção na remoção do Storage';
         }
 
         // Se a remoção física falhou, libera o lease com falha para recuperação segura e auditoria
@@ -389,7 +411,7 @@ export default async function handler(req: any, res: any) {
       if (qErr) {
         const { data: fallbackList } = await supabase
           .from('project_attachments')
-          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, created_at, updated_at')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, created_at, updated_at')
           .neq('state', 'DELETED')
           .is('quarantine_resolved_at', null)
           .gte('cleanup_attempts', 10)

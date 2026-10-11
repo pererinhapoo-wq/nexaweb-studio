@@ -603,15 +603,17 @@ async function runSimulationTests() {
     assert(adminActionGuard(true, { 'sec-fetch-site': 'same-origin', 'x-admin-action': 'quarantine-retry' }).ok === true, 'Ação com sessão e cabeçalho de mesma origem é autorizada');
 
     // 4. Teste de rejeição de retry quando item NÃO está em quarentena (attempts < 10)
+    // 4. Teste de rejeição de retry quando item NÃO está em quarentena (attempts < 10)
     function adminRetrySim(row) {
       if (row.cleanup_attempts < 10) return { ok: false, reason: 'NOT_IN_QUARANTINE' };
       if (row.cleanup_lease_expires_at && row.cleanup_lease_expires_at > new Date()) return { ok: false, reason: 'LEASE_ACTIVE' };
-      row.cleanup_attempts = 0;
       row.cleanup_lease_token = null;
       row.cleanup_lease_expires_at = null;
+      row.pending_dismiss_justification = null;
+      row.admin_retry_requested_at = new Date();
       row.state = 'DELETING';
-      row.quarantine_notes = '[RETRY manual por admin]';
-      return { ok: true, status: 'QUEUED_FOR_RETRY' };
+      row.quarantine_notes = `[RETRY manual por admin; histórico mantido com ${row.cleanup_attempts} tentativas]`;
+      return { ok: true, status: 'QUEUED_FOR_RETRY', cleanup_attempts: row.cleanup_attempts };
     }
 
     const nonQuarantineItem = { cleanup_attempts: 4, cleanup_lease_expires_at: null };
@@ -621,12 +623,13 @@ async function runSimulationTests() {
     const activeLeaseItem = { cleanup_attempts: 10, cleanup_lease_expires_at: new Date(Date.now() + 60000) };
     assert(adminRetrySim(activeLeaseItem).reason === 'LEASE_ACTIVE', 'Retry é rejeitado se houver lease ativo em execução');
 
-    // 6. Retry legítimo
+    // 6. Retry legítimo (preservando histórico auditável de tentativas sem zerar)
     const eligibleItem = { cleanup_attempts: 10, cleanup_lease_expires_at: null, quarantine_notes: null };
     const retryRes = adminRetrySim(eligibleItem);
     assert(retryRes.ok === true && retryRes.status === 'QUEUED_FOR_RETRY', 'Retry em item elegível reenfileira com sucesso');
-    assert(eligibleItem.cleanup_attempts === 0, 'Contador de tentativas zerado para reprocessamento');
-    assert(eligibleItem.quarantine_notes.includes('RETRY'), 'Histórico registrado em quarantine_notes');
+    assert(eligibleItem.cleanup_attempts === 10, 'Contador de tentativas preservado para auditoria (não zerado)');
+    assert(eligibleItem.admin_retry_requested_at instanceof Date, 'Marcação admin_retry_requested_at registrada');
+    assert(eligibleItem.quarantine_notes.includes('histórico mantido com 10 tentativas'), 'Histórico registrado em quarantine_notes');
   }
 
   // ---------------------------------------------------------------------------
