@@ -1,57 +1,43 @@
-# Guia de Integração: Revisão e Recuperação de Anexos em Quarentena (NexaWeb V4)
+# Guia de Integração: Limite Seguro de Retentativas em Quarentena (NexaWeb V4.1)
 
-Este documento descreve as correções técnicas e o fortalecimento de segurança implementados no ciclo de vida de anexos em quarentena do NexaWeb, atendendo à revisão obrigatória da V4. As alterações preservam a compatibilidade com a V3, mantêm o site e a interface existentes intactos e garantem que nenhuma operação seja marcada como concluída sem confirmação válida no banco de dados.
+Este documento descreve as correções pontuais implementadas na versão **V4.1** para solucionar o ciclo infinito de tentativas de descarte administrativo pendente no NexaWeb, introduzindo limite finito para falhas físicas no Storage, pausa automática com registro auditável, reautorização administrativa e diferenciação estrita de erros sem perda da capacidade de recuperação.
 
-> **IMPORTANTE:** Nenhuma instrução SQL foi executada no banco de dados e nenhuma conexão externa foi aberta com o Supabase. Os scripts SQL anteriores foram preservados. A aplicação em homologação ou produção deve seguir este guia.
+> **IMPORTANTE:** Nenhuma instrução SQL foi executada no banco de dados e nenhuma conexão externa foi aberta com o Supabase. As migrações anteriores (V3 e V4) foram preservadas intactas. A aplicação destas alterações em homologação ou produção deve seguir este guia.
 
 ---
 
-## 1. Problemas Abordados e Soluções Implementadas
+## 1. Problemas Abordados e Soluções Implementadas na V4.1
 
-### 1.1 Preservação da Recuperação após Falha Física
-* **Problema:** Se a remoção no Storage falhasse durante um descarte administrativo, o erro anterior corria o risco de limpar metadados de intenção ou deixar o registro preso indefinidamente, especialmente quando já acumulava 10 ou mais tentativas de limpeza.
-* **Solução:** Na RPC `record_attachment_cleanup_failure`:
-  - A coluna `pending_dismiss_justification` é **estritamente preservada** quando o registro pertencer a um descarte administrativo pendente.
-  - O histórico de tentativas (`cleanup_attempts`) é mantido inalterado (>= 10).
-  - O histórico de auditoria registra explicitamente a nota de falha física (`[FALHA_DISMISS_STORAGE: ...]`), diferenciando esse fluxo de falhas ordinárias de limpeza (`[FALHA_STORAGE: ...]`).
-  - O registro permanece elegível para retomada pelo Sweeper assim que o lease expirar.
+### 1.1 Limite Finito de Retentativas e Pausa Automática
+* **Problema:** Na versão V4, a preservação de `pending_dismiss_justification` garantia a recuperabilidade, mas permitia que falhas repetidas e persistentes de Storage (ex: bucket indisponível, permissões incorretas no provedor de nuvem) fossem reivindicadas infinitamente pelo Sweeper a cada expiração de lease.
+* **Solução:**
+  - Adicionado o contador específico `dismiss_failure_count` (separado de `cleanup_attempts`).
+  - Adicionadas as colunas `dismiss_paused_at` e `dismiss_pause_reason` em `public.project_attachments`.
+  - Na RPC `record_attachment_cleanup_failure`, cada falha física de descarte pendente incrementa `dismiss_failure_count`.
+  - Ao atingir o limite configurado (padrão de 5 falhas consecutivas), novas tentativas físicas automáticas são **pausadas**:
+    - `dismiss_paused_at = now()`
+    - `dismiss_pause_reason = 'LIMITE_FALHAS_ATINGIDO: 5 falhas consecutivas (...)'`
+    - Adiciona nota de auditoria explícita em `quarantine_notes` com a data e o total de falhas.
+  - A RPC `claim_attachments_for_cleanup` exclui expressamente registros com `dismiss_paused_at IS NOT NULL`, impedindo novas tentativas automáticas enquanto a operação estiver pausada.
+  - O registro **não é descartado silenciosamente**: permanece em quarentena (`DELETION_FAILED`), visível para os administradores no painel com indicação clara do motivo da pausa.
 
-### 1.2 Fortalecimento da Confirmação Administrativa
-* **Problema:** Um processo poderia tentar confirmar descarte com token antigo, ou confirmar registros que não possuíam intenção administrativa pendente.
-* **Solução:** Na RPC `admin_dismiss_quarantined_attachment` (Fase 2 - Confirmação):
-  - Exige estado válido (`state = 'DELETING'`).
-  - Exige intenção administrativa pendente (`pending_dismiss_justification IS NOT NULL`). Rejeita chamadas que não representem descartes administrativos com `NOT_A_PENDING_DISMISS`.
-  - Exige token ativo não nulo, coincidente e com lease não expirado (`cleanup_lease_expires_at > now()`).
-  - Rejeita tokens defasados de processos anteriores com `LEASE_MISMATCH` e reservas expiradas com `LEASE_EXPIRED`.
-  - Limpa `pending_dismiss_justification` apenas após a confirmação atômica bem-sucedida para `state = 'DELETED'`.
+### 1.2 Preservação Integral de Dados e Histórico de Auditoria
+* O contador histórico geral `cleanup_attempts` **não é zerado nem adulterado** (mantém o valor original acumulado, ex: 10, 14, etc.).
+* `pending_dismiss_justification` é **estritamente preservada** durante todo o período de pausa.
+* Nenhum anexo é marcado como `DELETED` sem confirmação válida e atômica da operação.
 
-### 1.3 Revisão e Preservação da Contagem de Tentativas
-* **Problema:** Zerar artificialmente `cleanup_attempts` para `0` em retries manuais mascarava o histórico real de falhas anteriores e comprometia a auditoria do sistema.
-* **Solução:** Na RPC `admin_retry_quarantined_attachment`:
-  - **Não zera** `cleanup_attempts`. O valor acumulado (ex: 10, 11, etc.) é preservado de forma íntegra.
-  - Registra a intenção administrativa preenchendo a nova coluna `admin_retry_requested_at = now()`.
-  - Adiciona nota de auditoria nas `quarantine_notes` explicitando a ação administrativa e o volume prévio de tentativas mantido.
-  - A RPC `claim_attachments_for_cleanup` captura o registro pelo critério de retry manual autorizado (`admin_retry_requested_at IS NOT NULL`), limpa a flag e avança o contador de tentativas de forma transparente.
+### 1.3 Reautorização Administrativa Segura
+* Nova RPC `admin_reauthorize_quarantined_attachment(p_attachment_id uuid, p_justification text default null)`:
+  - Permite ao administrador reautorizar uma operação pausada após corrigir a causa raiz externa (ex: credenciais do Storage ou restauração de infraestrutura).
+  - Limpa a pausa (`dismiss_paused_at = null`, `dismiss_pause_reason = null`), zera o contador de falhas consecutivas (`dismiss_failure_count = 0`) e agenda a retomada pelo Sweeper (`admin_retry_requested_at = now()`).
+  - Permite atualizar ou manter a justificativa auditada e preserva `cleanup_attempts`.
+  - Integrada à rota `/api/admin-projects?action=quarantine-reauthorize` e ao painel `AdminDashboard.tsx` com botão dedicado de **Reautorizar**.
 
-### 1.4 Integração Real do Sweeper (Cron) e Recuperação Segura
-* **Problema:** O Sweeper precisava diferenciar descartes administrativos pendentes de limpezas ordinárias e recuperar arquivos que já foram removidos fisicamente do Storage sem falhar nem reexecutar comandos desnecessários.
-* **Solução:** Em `api/cron-cleanup-attachments.ts`:
-  - A RPC `claim_attachments_for_cleanup` retorna `is_pending_dismiss` e `dismiss_justification`.
-  - O Cron verifica antecipadamente a existência do arquivo no Storage:
-    1. **Se o arquivo já não existe no Storage:** O cron detecta a situação e prossegue imediatamente para a confirmação atômica no banco (`admin_dismiss_quarantined_attachment` com o lease ativo do cron), sem emitir novo comando `storage.remove`.
-    2. **Se o arquivo ainda existe no Storage:** Executa a exclusão física e, em caso de sucesso, confirma no banco.
-  - Falhas de listagem, de remoção física e de confirmação de banco são tratadas e reportadas de forma estritamente separada.
-  - Um registro **nunca** é marcado como `DELETED` se a confirmação no banco falhar ou se o token for rejeitado.
-
-### 1.5 Compatibilidade Integral das RPCs na Migração V4
-* O arquivo `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` reúne todas as definições e atualizações:
-  - `claim_attachments_for_cleanup(batch_size, lease_seconds)`
-  - `admin_dismiss_quarantined_attachment(attachment_id, justification, lease_token)`
-  - `admin_retry_quarantined_attachment(attachment_id)`
-  - `confirm_attachment_deleted(attachment_id, lease_token)`
-  - `record_attachment_cleanup_failure(attachment_id, lease_token, error)`
-  - `get_quarantined_attachments(min_attempts, limit)`
-  - Permissões estritas revogando acesso público e concedendo execução exclusivamente a `service_role`.
+### 1.4 Diferenciação Estrita de Falhas no Cron e Sweeper
+* **Falha ao Listar o Storage (`storage.list`):** Não presume que o arquivo existe nem que foi removido. Registra a falha técnica via `record_attachment_cleanup_failure` sem chamar confirmação e mantém o anexo recuperável.
+* **Falha ao Remover o Arquivo (`storage.remove`):** Contabiliza falha física no `dismiss_failure_count`, pausa se atingir o limite e preserva o histórico.
+* **Arquivo Já Ausente do Storage (`!fileExists`):** Detecta que o arquivo já foi excluído em ciclo anterior e **não reexecuta** `storage.remove`. Prossegue diretamente para a confirmação atômica no banco usando o lease ativo.
+* **Falha de Confirmação no Banco:** Se a remoção física tiver ocorrido mas a confirmação no banco falhar, o anexo **não é marcado como DELETED**. Permanece em quarentena com `pending_dismiss_justification` para reconciliação segura no ciclo seguinte sem nova exclusão física.
 
 ---
 
@@ -59,57 +45,62 @@ Este documento descreve as correções técnicas e o fortalecimento de seguranç
 
 | Arquivo | Caminho no Repositório | Estado | Descrição |
 | :--- | :--- | :--- | :--- |
-| `MIGRACAO_UPLOADS_PENDENTE.sql` | `MIGRACAO_UPLOADS_PENDENTE.sql` | **Preservado** | Migração SQL original intacta. |
-| `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | **Preservado** | Migração SQL da versão V3 preservada. |
-| `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | **Novo (V4)** | Migração revisada com preservação de justificativa, histórico auditável de retry e todas as RPCs integradas. |
-| `api/admin-projects.ts` | `api/admin-projects.ts` | **Corrigido** | Retry e descarte administrativo com lease atômico, auditoria e fallback sincronizado. |
-| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Corrigido** | Processamento de `is_pending_dismiss`, recuperação de arquivos ausentes e métricas sem registros DELETED. |
-| `api/create-briefing.ts` | `api/create-briefing.ts` | **Preservado** | Geração segura de tickets HMAC de 15 minutos. |
-| `api/upload-briefing.ts` | `api/upload-briefing.ts` | **Preservado** | Validação binária mágica e cotas por projeto. |
-| `api/_session.ts` | `api/_session.ts` | **Preservado** | Sessão de cliente assinada via HMAC SHA-256. |
-| `api/_portal-session.ts` | `api/_portal-session.ts` | **Preservado** | Sessão de portal assinada com cookies seguros. |
-| `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Preservado** | Painel administrativo com suporte a quarentena, retry e dismiss. |
-| `src/components/ContactModal.tsx` | `src/components/ContactModal.tsx` | **Preservado** | Formulário de contato com modal acessível. |
-| `tests/quarantine-security-regression.test.mjs` | `tests/quarantine-security-regression.test.mjs` | **Atualizado (V4)** | 49 testes cobrindo todo o ciclo de vida, recuperação e concorrência da V4. |
-| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Atualizado (V4)** | 70 testes simulados cobrindo retry auditável, sweeper e RPCs. |
-| `tests/test-upload-suite.mjs` | `tests/test-upload-suite.mjs` | **Existente** | Suíte de testes de upload de briefings (22 testes). |
+| `MIGRACAO_UPLOADS_PENDENTE.sql` | `MIGRACAO_UPLOADS_PENDENTE.sql` | **Preservado** | Migração original intacta. |
+| `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V3.sql` | **Preservado** | Migração V3 original intacta. |
+| `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V4.sql` | **Preservado** | Migração V4 original intacta. |
+| `MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql` | `MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql` | **Novo (V4.1)** | Migração revisada com limite finito de retentativas, pausa de descarte e reautorização administrativa. |
+| `api/admin-projects.ts` | `api/admin-projects.ts` | **Atualizado** | Endpoint com ação `quarantine-reauthorize`, suporte CSRF e fallback sincronizado. |
+| `api/cron-cleanup-attachments.ts` | `api/cron-cleanup-attachments.ts` | **Atualizado** | Sweeper com diferenciação de erros, exclusão de itens pausados e reporte de `is_paused`. |
+| `src/components/AdminDashboard.tsx` | `src/components/AdminDashboard.tsx` | **Atualizado** | Exibição de status de pausa, motivo da falha e botão de reautorização administrativa. |
+| `src/components/ContactModal.tsx` | `src/components/ContactModal.tsx` | **Preservado** | Formulário de contato acessível. |
+| `api/create-briefing.ts` | `api/create-briefing.ts` | **Preservado** | Geração segura de tickets HMAC. |
+| `api/upload-briefing.ts` | `api/upload-briefing.ts` | **Preservado** | Validação binária e cotas de briefing. |
+| `api/_session.ts` | `api/_session.ts` | **Preservado** | Sessão de cliente assinada via HMAC. |
+| `api/_portal-session.ts` | `api/_portal-session.ts` | **Preservado** | Sessão do portal com cookies seguros. |
+| `tests/quarantine-security-regression.test.mjs` | `tests/quarantine-security-regression.test.mjs` | **Atualizado (V4.1)** | Suíte com 52 testes cobrindo os 10 cenários obrigatórios da V4.1. |
+| `tests/cron-sweeper-simulation.test.mjs` | `tests/cron-sweeper-simulation.test.mjs` | **Atualizado (V4.1)** | Suíte completa com 71 testes simulados do ciclo de vida e permissões. |
+| `tests/test-upload-suite.mjs` | `tests/test-upload-suite.mjs` | **Existente** | Suíte de upload de briefings (22 testes). |
 | `tests/test-e2e-handler.mjs` | `tests/test-e2e-handler.mjs` | **Existente** | Testes ponta a ponta dos handlers serverless. |
-| `vercel.json` | `vercel.json` | **Preservado** | Configuração de rotas e cron triggers na Vercel. |
-| `README-INTEGRACAO.md` | `README-INTEGRACAO.md` | **Atualizado** | Documentação técnica completa da V4. |
+| `vercel.json` | `vercel.json` | **Preservado** | Configurações de rotas e cron triggers. |
+| `README-INTEGRACAO.md` | `README-INTEGRACAO.md` | **Atualizado** | Guia técnico e relatório de validação da V4.1. |
 | `MANIFESTO-ENTREGA.txt` | `MANIFESTO-ENTREGA.txt` | **Atualizado** | Manifesto com hashes SHA-256 e tamanhos exatos. |
 
 ---
 
 ## 3. Resultados dos Testes Automatizados Locais
 
-Todas as suítes foram executadas e aprovadas com código de saída 0:
+Todas as suítes foram executadas no ambiente local e aprovadas com código de saída 0:
 
-1. **Suíte de Regressão V4 (`tests/quarantine-security-regression.test.mjs`):**
-   - **49 testes executados / 49 aprovados (100% de sucesso)**
-   - Cenários cobertos:
-     - Descarte administrativo iniciado com 10 ou mais tentativas.
-     - Rejeição de descarte fora da quarentena (< 10 tentativas).
-     - Ordem estrita entre banco e Storage.
-     - Falha física no Storage preservando `pending_dismiss_justification` e contador histórico.
-     - Falha de confirmação não marcando falso sucesso `DELETED`.
-     - Expiração de reserva (lease timeout) e rejeição com `LEASE_EXPIRED`.
-     - Rejeição estrita de token antigo / defasado com `LEASE_MISMATCH`.
-     - Retomada pelo Cron de registros com `cleanup_attempts >= 10` e justificativa pendente.
-     - Recuperação pelo Cron de arquivos já ausentes no Storage sem nova tentativa de exclusão física.
-     - Concorrência segura e bloqueio atômico de workers simultâneos (`LEASE_ACTIVE`).
-     - Idempotência e rejeição com `ALREADY_DELETED` em registros já resolvidos.
-     - Preservação auditável do contador no retry manual (`admin_retry_requested_at`).
-     - Exclusão de registros `DELETED` nas consultas e métricas do Cron.
-     - Proteção de sessão administrativa, CSRF e acesso exclusivo de `service_role`.
+1. **Suíte de Regressão V4.1 (`tests/quarantine-security-regression.test.mjs`):**
+   - **52 testes executados / 52 aprovados (100% de sucesso)**
+   - Cenários obrigatórios validados:
+     - Falhas repetidas de remoção até atingir o limite de 5 tentativas.
+     - Confirmação de que o Cron deixa de repetir a operação física após o limite.
+     - Preservação integral da justificativa e do histórico após a pausa.
+     - Reautorização administrativa (`admin_reauthorize_quarantined_attachment`) e retomada segura pelo Cron.
+     - Arquivo removido no Storage com confirmação no banco falhando (não marca DELETED).
+     - Recuperação posterior pelo Cron quando o arquivo já não existe no Storage (sem novo `remove`).
+     - Falha de listagem no Storage sem presumir sucesso.
+     - Rejeição estrita de tokens antigos (`LEASE_MISMATCH`) e leases expirados (`LEASE_EXPIRED`).
+     - Concorrência atômica entre múltiplos workers (`LEASE_ACTIVE`).
+     - Garantia de que registros resolvidos (`DELETED`) não voltam à fila nem aceitam novas mutações.
 
 2. **Suíte do Sweeper e RPCs (`tests/cron-sweeper-simulation.test.mjs`):**
-   - **70 testes executados / 70 aprovados (100% de sucesso)**
+   - **71 testes executados / 71 aprovados (100% de sucesso)**
 
-3. **Suíte de Uploads de Briefings (`tests/test-upload-suite.mjs`):**
+3. **Suíte de Upload de Briefings (`tests/test-upload-suite.mjs`):**
    - **22 testes executados / 22 aprovados (100% de sucesso)**
 
 4. **Verificação de Tipos TypeScript (`npx tsc --noEmit`):**
-   - **0 erros encontrados (Código 0)**
+   - **0 erros de tipagem (Código 0)**
 
 5. **Build de Produção (`npm run build`):**
-   - **Sucesso em 1.05s**
+   - **Compilação concluída com sucesso em 1.09s**
+
+---
+
+## 4. O que Requer Revisão Manual pelo DBA / Administrador
+
+1. **Aplicação do Script SQL:** Executar `MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql` no SQL Editor do painel Supabase utilizando a role de serviço / administrador (`postgres` / `service_role`).
+2. **Definição de Limite Personalizado:** Caso a equipe queira alterar o limite padrão de 5 falhas consecutivas para outro valor (ex: 3 ou 10), o 4º argumento de `record_attachment_cleanup_failure` pode ser customizado.
+3. **Monitoramento:** No painel `/admin`, monitorar anexos sinalizados com o badge `PAUSADO` e utilizar o botão `Reautorizar` após checar a integridade do bucket no Supabase.

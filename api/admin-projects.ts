@@ -45,7 +45,8 @@ export default async function handler(req: any, res: any) {
       xRequestedWith === 'XMLHttpRequest' ||
       customAction === 'quarantine-action' ||
       customAction === 'quarantine-retry' ||
-      customAction === 'quarantine-dismiss';
+      customAction === 'quarantine-dismiss' ||
+      customAction === 'quarantine-reauthorize';
 
     if (!isSameOrigin && !hasSecureHeader) {
       return res.status(403).json({
@@ -289,6 +290,50 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // 4.3 Reautorização administrativa de descarte pausado (V4.1)
+    if (action === 'quarantine-reauthorize') {
+      const attachmentId = (bodyData?.attachmentId || queryParams.attachmentId || '').trim();
+      const justification = (bodyData?.justification || '').trim();
+
+      if (!attachmentId || !UUID_REGEX.test(attachmentId)) {
+        return res.status(400).json({ error: 'Identificador de anexo inválido ou ausente.' });
+      }
+
+      try {
+        const { data: reauthRes, error: reauthErr } = await supabase.rpc(
+          'admin_reauthorize_quarantined_attachment',
+          {
+            p_attachment_id: attachmentId,
+            p_justification: justification && justification.length >= 5 ? justification : null,
+          }
+        );
+
+        if (reauthErr || !reauthRes?.ok) {
+          const reason = reauthErr?.message || reauthRes?.reason || 'Falha ao reautorizar descarte pausado.';
+          if (reason === 'ATTACHMENT_NOT_FOUND') {
+            return res.status(404).json({ error: 'Anexo não encontrado.' });
+          }
+          if (reason === 'ALREADY_DELETED') {
+            return res.status(409).json({ error: 'O anexo já foi excluído/resolvido e não pode ser reautorizado.' });
+          }
+          if (reason === 'LEASE_ACTIVE') {
+            return res.status(409).json({ error: 'O anexo possui lease ativo em execução.' });
+          }
+          if (reason === 'NOT_A_PENDING_DISMISS') {
+            return res.status(400).json({ error: 'O anexo não possui descarte administrativo pendente.' });
+          }
+          return res.status(400).json({ error: reason });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Descarte administrativo reautorizado com sucesso para nova tentativa pelo Sweeper.',
+        });
+      } catch (err: any) {
+        return res.status(500).json({ error: err?.message || 'Erro inesperado na reautorização administrativa.' });
+      }
+    }
+
     return res.status(400).json({ error: 'Ação POST administrativa não reconhecida.' });
   }
 
@@ -411,7 +456,7 @@ export default async function handler(req: any, res: any) {
       if (qErr) {
         const { data: fallbackList } = await supabase
           .from('project_attachments')
-          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, created_at, updated_at')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, dismiss_failure_count, dismiss_paused_at, dismiss_pause_reason, created_at, updated_at')
           .neq('state', 'DELETED')
           .is('quarantine_resolved_at', null)
           .gte('cleanup_attempts', 10)

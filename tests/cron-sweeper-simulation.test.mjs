@@ -792,6 +792,7 @@ async function runSimulationTests() {
       get_quarantined_attachments: ['service_role'],
       admin_retry_quarantined_attachment: ['service_role'],
       admin_dismiss_quarantined_attachment: ['service_role'],
+      admin_reauthorize_quarantined_attachment: ['service_role'],
     };
 
     for (const [fn, roles] of Object.entries(rpcPermissions)) {

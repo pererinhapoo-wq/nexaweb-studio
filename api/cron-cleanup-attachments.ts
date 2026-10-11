@@ -109,7 +109,7 @@ export default async function handler(req: any, res: any) {
       if (qErr) {
         const { data: fallbackList, error: fallbackErr } = await supabase
           .from('project_attachments')
-          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, created_at, updated_at')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, pending_dismiss_justification, admin_retry_requested_at, dismiss_failure_count, dismiss_paused_at, dismiss_pause_reason, created_at, updated_at')
           .neq('state', 'DELETED')
           .is('quarantine_resolved_at', null)
           .gte('cleanup_attempts', 10)
@@ -186,6 +186,8 @@ export default async function handler(req: any, res: any) {
       status: 'DELETED' | 'DELETION_FAILED' | 'DELETION_FAILED_UNRECORDED' | 'CONFIRMATION_FAILED';
       error?: string;
       quarantined?: boolean;
+      is_paused?: boolean;
+      dismiss_failure_count?: number;
     }> = [];
 
     // 4. Processa cada anexo reivindicado com confirmação estrita de remoção física e de transação no banco
@@ -227,7 +229,7 @@ export default async function handler(req: any, res: any) {
       if (listingError) {
         failed++;
         console.error('CRON_STORAGE_LISTING_FAILED', { storage_path, error: listingError });
-        await supabase.rpc('record_attachment_cleanup_failure', {
+        const { data: failListingData } = await supabase.rpc('record_attachment_cleanup_failure', {
           p_attachment_id: attachment_id,
           p_lease_token: lease_token,
           p_error: `FALHA_LISTAGEM_STORAGE: ${listingError}`,
@@ -238,6 +240,8 @@ export default async function handler(req: any, res: any) {
           status: 'DELETION_FAILED',
           error: `Falha na verificação de existência no Storage: ${listingError}`,
           quarantined: (cleanup_attempts >= 10),
+          is_paused: Boolean(failListingData?.is_paused),
+          dismiss_failure_count: failListingData?.dismiss_failure_count,
         });
         continue;
       }
@@ -320,6 +324,8 @@ export default async function handler(req: any, res: any) {
             status: 'DELETION_FAILED',
             error: errorMessage,
             quarantined: isQuarantined,
+            is_paused: Boolean(failData?.is_paused),
+            dismiss_failure_count: failData?.dismiss_failure_count,
           });
         }
         continue;

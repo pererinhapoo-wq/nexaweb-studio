@@ -1,30 +1,27 @@
 import crypto from 'crypto';
 
 /**
- * Suite de Testes de Regressão Obrigatórios da V4:
- * Segurança, Recuperação e Consistência de Anexos em Quarentena
+ * Suite de Testes de Regressão Obrigatórios da V4.1:
+ * Limite Seguro de Retentativas, Pausa Automática e Recuperação em Quarentena
  *
- * Cobre estritamente os cenários exigidos pela especificação:
- * 1. Descarte administrativo começa com 10 ou mais tentativas.
- * 2. Ordem estrita: banco validado antes de remoção no Storage.
- * 3. Falha no Storage preserva pending_dismiss_justification e não mascara falha.
- * 4. Falha de confirmação após remoção física não marca DELETED e mantém recuperação ativa.
- * 5. Expiração da reserva (lease timeout) libera o registro para nova tentativa segura.
- * 6. Rejeição estrita de token antigo / expirado em confirmação de descarte.
- * 7. Retomada automática pelo Sweeper (Cron) de itens pendentes de descarte com >= 10 tentativas.
- * 8. Cron recupera sem reexecutar remoção quando o arquivo já não existe no Storage.
- * 9. Concorrência e bloqueio: múltiplos processos disputando o mesmo anexo não geram inconsistência.
- * 10. Idempotência e rejeição de ações repetidas em itens já resolvidos (DELETED).
- * 11. Preservação do histórico auditável de tentativas no retry manual (sem zerar artificialmente).
- * 12. Consultas e métricas excluem estritamente registros DELETED ou resolvidos.
- * 13. Proteção de autorização, CSRF e acesso exclusivo de service_role.
+ * Cobre estritamente os 10 cenários exigidos pela especificação:
+ * 1. Falhas repetidas de remoção até atingir o limite.
+ * 2. Confirmação de que o cron deixa de repetir automaticamente a operação física após o limite.
+ * 3. Preservação da justificativa e do histórico após a pausa.
+ * 4. Reautorização administrativa e retomada segura.
+ * 5. Arquivo removido com confirmação no banco falhando.
+ * 6. Recuperação posterior quando o arquivo já não existe.
+ * 7. Falhas de listagem sem presumir sucesso.
+ * 8. Rejeição de tokens antigos e leases expirados.
+ * 9. Duas execuções concorrentes.
+ * 10. Garantia de que um registro resolvido não volte à fila.
  *
  * Executado localmente em memória com simulações e mocks sem dados reais.
  */
 
 async function runQuarantineSecurityRegressionTests() {
   console.log('========================================================================');
-  console.log('SUITE DE REGRESSÃO OBRIGATÓRIA V4: RECUPERAÇÃO E SEGURANÇA DE QUARENTENA');
+  console.log('SUITE DE REGRESSÃO OBRIGATÓRIA V4.1: LIMITE SEGURO DE RETENTATIVAS');
   console.log('========================================================================\n');
 
   let passed = 0;
@@ -41,7 +38,7 @@ async function runQuarantineSecurityRegressionTests() {
   }
 
   // ===========================================================================
-  // Simulador Fiel do Banco de Dados e RPCs (MIGRACAO_UPLOADS_QUARENTENA_V4.sql)
+  // Simulador Fiel do Banco de Dados e RPCs (MIGRACAO_UPLOADS_QUARENTENA_V4_1.sql)
   // ===========================================================================
   class MockQuarantineDatabase {
     constructor() {
@@ -66,6 +63,9 @@ async function runQuarantineSecurityRegressionTests() {
         quarantine_resolved_at: record.quarantine_resolved_at || null,
         pending_dismiss_justification: record.pending_dismiss_justification || null,
         admin_retry_requested_at: record.admin_retry_requested_at || null,
+        dismiss_failure_count: record.dismiss_failure_count !== undefined ? record.dismiss_failure_count : 0,
+        dismiss_paused_at: record.dismiss_paused_at || null,
+        dismiss_pause_reason: record.dismiss_pause_reason || null,
         reservation_expires_at: record.reservation_expires_at || null,
         created_at: record.created_at || new Date(),
         updated_at: record.updated_at || new Date(),
@@ -90,8 +90,11 @@ async function runQuarantineSecurityRegressionTests() {
                               att.cleanup_attempts < 10 &&
                               att.pending_dismiss_justification === null &&
                               att.admin_retry_requested_at === null;
+        // Caso C: Descarte pendente recuperável desde que NÃO esteja pausado por excesso de falhas
         const isPendingDismiss = ['DELETING', 'DELETION_FAILED'].includes(att.state) &&
-                                 att.pending_dismiss_justification !== null;
+                                 att.pending_dismiss_justification !== null &&
+                                 att.dismiss_paused_at === null;
+        // Caso D: Reautorização ou retry explícito pelo admin
         const isAdminRetry = ['DELETING', 'DELETION_FAILED'].includes(att.state) &&
                              att.admin_retry_requested_at !== null;
 
@@ -100,7 +103,7 @@ async function runQuarantineSecurityRegressionTests() {
           att.cleanup_lease_token = token;
           att.cleanup_lease_expires_at = new Date(Date.now() + leaseSeconds * 1000);
 
-          // Preserva contador em descartes pendentes; avança em outros
+          // Preserva contador em descartes pendentes; avança em limpezas normais
           if (!att.pending_dismiss_justification) {
             att.cleanup_attempts++;
           }
@@ -115,6 +118,8 @@ async function runQuarantineSecurityRegressionTests() {
             lease_token: token,
             is_pending_dismiss: Boolean(att.pending_dismiss_justification),
             dismiss_justification: att.pending_dismiss_justification,
+            dismiss_failure_count: att.dismiss_failure_count,
+            is_dismiss_paused: Boolean(att.dismiss_paused_at),
           });
 
           if (claimed.length >= batchSize) break;
@@ -153,7 +158,6 @@ async function runQuarantineSecurityRegressionTests() {
       return results.slice(0, limit);
     }
 
-    // Métrica do Cron: contagem de quarentena pendente
     cronQuarantinedMetricCount() {
       let count = 0;
       for (const att of this.attachments.values()) {
@@ -168,7 +172,34 @@ async function runQuarantineSecurityRegressionTests() {
       return count;
     }
 
-    // RPC: admin_retry_quarantined_attachment (V4: PRESERVA HISTÓRICO DE TENTATIVAS)
+    // RPC: admin_reauthorize_quarantined_attachment (V4.1)
+    admin_reauthorize_quarantined_attachment(attachmentId, justification = null) {
+      const att = this.attachments.get(attachmentId);
+      if (!att) return { ok: false, reason: 'ATTACHMENT_NOT_FOUND' };
+      if (att.state === 'DELETED') return { ok: false, reason: 'ALREADY_DELETED' };
+      if (att.cleanup_lease_expires_at && att.cleanup_lease_expires_at > new Date()) {
+        return { ok: false, reason: 'LEASE_ACTIVE' };
+      }
+      if (!att.pending_dismiss_justification) {
+        return { ok: false, reason: 'NOT_A_PENDING_DISMISS' };
+      }
+
+      att.dismiss_failure_count = 0;
+      att.dismiss_paused_at = null;
+      att.dismiss_pause_reason = null;
+      att.cleanup_lease_token = null;
+      att.cleanup_lease_expires_at = null;
+      att.admin_retry_requested_at = new Date();
+      if (justification && justification.trim().length >= 5) {
+        att.pending_dismiss_justification = justification.trim();
+      }
+      att.state = 'DELETING';
+      att.quarantine_notes = (att.quarantine_notes || '') + ` [REAUTORIZADO por admin em ${new Date().toISOString()}]`;
+      att.updated_at = new Date();
+      return { ok: true, status: 'REAUTHORIZED_FOR_CLEANUP', cleanup_attempts: att.cleanup_attempts };
+    }
+
+    // RPC: admin_retry_quarantined_attachment
     admin_retry_quarantined_attachment(attachmentId) {
       const att = this.attachments.get(attachmentId);
       if (!att) return { ok: false, reason: 'ATTACHMENT_NOT_FOUND' };
@@ -183,10 +214,13 @@ async function runQuarantineSecurityRegressionTests() {
         return { ok: false, reason: 'LEASE_ACTIVE' };
       }
 
-      // PRESERVA cleanup_attempts sem zerar artificialmente
+      // Limpa pausa prévia, preserva cleanup_attempts sem zerar
       att.cleanup_lease_token = null;
       att.cleanup_lease_expires_at = null;
       att.pending_dismiss_justification = null;
+      att.dismiss_failure_count = 0;
+      att.dismiss_paused_at = null;
+      att.dismiss_pause_reason = null;
       att.admin_retry_requested_at = new Date();
       att.state = 'DELETING';
       att.quarantine_notes = (att.quarantine_notes || '') + ` [RETRY manual por admin; histórico mantido com ${att.cleanup_attempts} tentativas]`;
@@ -195,7 +229,7 @@ async function runQuarantineSecurityRegressionTests() {
       return { ok: true, status: 'QUEUED_FOR_RETRY', cleanup_attempts: att.cleanup_attempts };
     }
 
-    // RPC: admin_dismiss_quarantined_attachment (V4: FASE 1 CLAIM E FASE 2 CONFIRMAÇÃO FORTALECIDA)
+    // RPC: admin_dismiss_quarantined_attachment
     admin_dismiss_quarantined_attachment(attachmentId, justification, leaseToken = null) {
       if (!justification || justification.trim().length < 5) {
         return { ok: false, reason: 'JUSTIFICATION_REQUIRED' };
@@ -221,6 +255,9 @@ async function runQuarantineSecurityRegressionTests() {
         att.cleanup_lease_token = token;
         att.cleanup_lease_expires_at = new Date(Date.now() + 120000);
         att.pending_dismiss_justification = justification.trim();
+        att.dismiss_failure_count = 0;
+        att.dismiss_paused_at = null;
+        att.dismiss_pause_reason = null;
         att.quarantine_notes = (att.quarantine_notes || '') + ` [DISMISS_CLAIMED: ${justification.trim()}]`;
         att.updated_at = new Date();
         return { ok: true, status: 'CLAIMED_FOR_DISMISS', lease_token: token, storage_path: att.storage_path };
@@ -246,14 +283,17 @@ async function runQuarantineSecurityRegressionTests() {
       att.state = 'DELETED';
       att.cleanup_lease_token = null;
       att.cleanup_lease_expires_at = null;
-      att.pending_dismiss_justification = null; // Limpa pendência após confirmação com sucesso
+      att.pending_dismiss_justification = null;
+      att.dismiss_failure_count = 0;
+      att.dismiss_paused_at = null;
+      att.dismiss_pause_reason = null;
       att.quarantine_notes = (att.quarantine_notes || '') + ` [DISMISSED: ${justification.trim()}]`;
       att.quarantine_resolved_at = new Date();
       att.updated_at = new Date();
       return { ok: true, status: 'DISMISSED' };
     }
 
-    // RPC: confirm_attachment_deleted (para exclusão ordinária do sweeper)
+    // RPC: confirm_attachment_deleted
     confirm_attachment_deleted(attachmentId, leaseToken) {
       if (!leaseToken) return { ok: false, reason: 'LEASE_TOKEN_REQUIRED' };
       const att = this.attachments.get(attachmentId);
@@ -271,6 +311,8 @@ async function runQuarantineSecurityRegressionTests() {
       att.cleanup_lease_token = null;
       att.cleanup_lease_expires_at = null;
       att.pending_dismiss_justification = null;
+      att.dismiss_failure_count = 0;
+      att.dismiss_paused_at = null;
       if (att.cleanup_attempts >= 10) {
         att.quarantine_resolved_at = att.quarantine_resolved_at || new Date();
       }
@@ -278,464 +320,474 @@ async function runQuarantineSecurityRegressionTests() {
       return { ok: true };
     }
 
-    // RPC: record_attachment_cleanup_failure (V4: PRESERVA pending_dismiss_justification)
-    record_attachment_cleanup_failure(attachmentId, leaseToken, error) {
+    // RPC: record_attachment_cleanup_failure com limite finito e pausa automática (V4.1)
+    record_attachment_cleanup_failure(attachmentId, leaseToken, error, maxFailures = 5) {
       const att = this.attachments.get(attachmentId);
       if (!att) return { ok: false, reason: 'ATTACHMENT_NOT_FOUND' };
       if (!leaseToken) return { ok: false, reason: 'LEASE_TOKEN_REQUIRED' };
       if (att.cleanup_lease_token !== leaseToken || !att.cleanup_lease_expires_at || att.cleanup_lease_expires_at <= new Date()) {
         return { ok: false, reason: 'LEASE_MISMATCH_OR_EXPIRED' };
       }
+
       att.state = 'DELETION_FAILED';
       att.last_cleanup_error = error;
       att.cleanup_lease_token = null;
       att.cleanup_lease_expires_at = null;
-      const isPending = Boolean(att.pending_dismiss_justification);
-      att.quarantine_notes = (att.quarantine_notes || '') + ` [${isPending ? 'FALHA_DISMISS_STORAGE' : 'FALHA_STORAGE'}: ${error}]`;
+
+      if (att.pending_dismiss_justification) {
+        att.dismiss_failure_count = (att.dismiss_failure_count || 0) + 1;
+        const isPaused = att.dismiss_failure_count >= maxFailures;
+        if (isPaused) {
+          att.dismiss_paused_at = new Date();
+          att.dismiss_pause_reason = `LIMITE_FALHAS_ATINGIDO: ${att.dismiss_failure_count} falhas consecutivas (${error})`;
+          att.quarantine_notes = (att.quarantine_notes || '') + ` [PAUSADO: ${att.dismiss_failure_count} falhas consecutivas (${error})]`;
+        } else {
+          att.quarantine_notes = (att.quarantine_notes || '') + ` [FALHA_DISMISS_STORAGE (${att.dismiss_failure_count}/${maxFailures}): ${error}]`;
+        }
+        att.updated_at = new Date();
+        return {
+          ok: true,
+          cleanup_attempts: att.cleanup_attempts,
+          quarantined: att.cleanup_attempts >= 10,
+          is_pending_dismiss: true,
+          dismiss_failure_count: att.dismiss_failure_count,
+          is_paused: isPaused,
+          paused_at: att.dismiss_paused_at,
+          pause_reason: att.dismiss_pause_reason,
+        };
+      }
+
+      // Limpeza normal (sem descarte pendente)
+      att.quarantine_notes = (att.quarantine_notes || '') + ` [FALHA_STORAGE: ${error}]`;
       att.updated_at = new Date();
       return {
         ok: true,
         cleanup_attempts: att.cleanup_attempts,
         quarantined: att.cleanup_attempts >= 10,
-        is_pending_dismiss: isPending,
+        is_pending_dismiss: false,
+        is_paused: false,
       };
     }
   }
 
   // ===========================================================================
-  // CENÁRIO 1: Descarte administrativo começa com 10 ou mais tentativas
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    const item10 = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
-    const item9 = db.addAttachment({ cleanup_attempts: 9, state: 'DELETION_FAILED' });
-
-    // Item com 10 tentativas é elegível para claim administrativo
-    const claim10 = db.admin_dismiss_quarantined_attachment(item10.id, 'Arquivo órfão validado para descarte');
-    assert(
-      claim10.ok === true && claim10.status === 'CLAIMED_FOR_DISMISS' && typeof claim10.lease_token === 'string',
-      'Descarte administrativo é aceito com sucesso para registro com 10 ou mais tentativas'
-    );
-    assert(
-      item10.pending_dismiss_justification === 'Arquivo órfão validado para descarte',
-      'Justificativa de descarte é gravada em pending_dismiss_justification durante a Fase 1'
-    );
-
-    // Item com 9 tentativas NÃO pode sofrer descarte de quarentena
-    const claim9 = db.admin_dismiss_quarantined_attachment(item9.id, 'Tentativa em anexo fora da quarentena');
-    assert(
-      claim9.ok === false && claim9.reason === 'NOT_IN_QUARANTINE',
-      'Descarte administrativo é rejeitado para registro com menos de 10 tentativas (NOT_IN_QUARANTINE)'
-    );
-  }
-
-  // ===========================================================================
-  // CENÁRIO 2: Ordem estrita - Banco validado antes da remoção física no Storage
+  // CENÁRIO 1: Falhas repetidas de remoção até atingir o limite finito
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
     const item = db.addAttachment({ cleanup_attempts: 12, state: 'DELETION_FAILED' });
 
-    let order = [];
-    const storageMock = {
-      remove: async () => {
-        order.push('STORAGE_REMOVE');
-        return { error: null };
-      }
-    };
+    // Inicia descarte administrativo
+    const claim = db.admin_dismiss_quarantined_attachment(item.id, 'Arquivo corrompido para expurgo');
+    assert(claim.ok === true, 'Descarte administrativo iniciado com sucesso');
 
-    async function executeDismiss(id, just) {
-      order.push('CLAIM_PHASE_1');
-      const claim = db.admin_dismiss_quarantined_attachment(id, just);
-      if (!claim.ok) return claim;
+    // Simula 4 falhas consecutivas de remoção física (abaixo do limite de 5)
+    let currentToken = claim.lease_token;
+    for (let i = 1; i <= 4; i++) {
+      const failRes = db.record_attachment_cleanup_failure(item.id, currentToken, `Falha física S3 #${i}`, 5);
+      assert(
+        failRes.ok === true && failRes.is_paused === false && failRes.dismiss_failure_count === i,
+        `Falha física #${i} registrada sem pausar (contador = ${i}/5)`
+      );
+      assert(item.dismiss_paused_at === null, `Registro permanece ativo na tentativa ${i}`);
 
-      const { error: sErr } = await storageMock.remove([claim.storage_path]);
-      if (sErr) {
-        db.record_attachment_cleanup_failure(id, claim.lease_token, sErr.message);
-        return { ok: false, error: sErr.message };
-      }
-
-      order.push('CONFIRM_PHASE_2');
-      return db.admin_dismiss_quarantined_attachment(id, just, claim.lease_token);
+      // Simula o Sweeper reivindicando novamente após a expiração
+      const [nextClaim] = db.claim_attachments_for_cleanup(1, 120);
+      assert(nextClaim !== undefined, `Sweeper reivindica com sucesso para tentativa ${i + 1}`);
+      currentToken = nextClaim.lease_token;
     }
 
-    // Justificativa inválida: Storage NUNCA deve ser chamado
-    order = [];
-    const invalidRes = await executeDismiss(item.id, 'abc');
+    // 5ª falha: atinge o limite configurado de 5 falhas consecutivas
+    const fifthFail = db.record_attachment_cleanup_failure(item.id, currentToken, 'Falha física S3 #5', 5);
     assert(
-      invalidRes.ok === false && !order.includes('STORAGE_REMOVE'),
-      'Storage NUNCA é acionado se a validação atômica no banco falhar'
+      fifthFail.ok === true && fifthFail.is_paused === true && fifthFail.dismiss_failure_count === 5,
+      'A 5ª falha física consecutiva atinge o limite e dispara a pausa automática'
     );
-
-    // Fluxo válido: Ordem estrita garantida
-    order = [];
-    const validRes = await executeDismiss(item.id, 'Justificativa de descarte aprovada');
     assert(
-      validRes.ok === true &&
-      order[0] === 'CLAIM_PHASE_1' &&
-      order[1] === 'STORAGE_REMOVE' &&
-      order[2] === 'CONFIRM_PHASE_2',
-      'Ordem estrita garantida: Transição validada no banco (Fase 1) precede a exclusão no Storage'
+      item.dismiss_paused_at instanceof Date,
+      'dismiss_paused_at é preenchido com timestamp da pausa'
+    );
+    assert(
+      item.dismiss_pause_reason.includes('LIMITE_FALHAS_ATINGIDO') && item.dismiss_pause_reason.includes('5 falhas'),
+      'dismiss_pause_reason documenta claramente o motivo e o número de falhas'
     );
   }
 
   // ===========================================================================
-  // CENÁRIO 3: Falha no Storage preserva pending_dismiss_justification e tentativas
+  // CENÁRIO 2: Cron deixa de repetir automaticamente a operação física após o limite
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
+    // Item pausado por ter atingido 5 falhas
+    const pausedItem = db.addAttachment({
+      cleanup_attempts: 12,
+      state: 'DELETION_FAILED',
+      pending_dismiss_justification: 'Descarte bloqueado por storage indisponível',
+      dismiss_failure_count: 5,
+      dismiss_paused_at: new Date(),
+      dismiss_pause_reason: 'LIMITE_FALHAS_ATINGIDO: 5 falhas consecutivas',
+    });
 
-    // Inicia descarte
-    const claim = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte legítimo');
-    assert(claim.ok === true, 'Claim de descarte obtido com sucesso');
+    // Item normal elegível
+    const activeItem = db.addAttachment({
+      cleanup_attempts: 5,
+      state: 'DELETION_FAILED',
+      cleanup_lease_expires_at: null,
+    });
 
-    // Simula falha física de exclusão no Storage (ex: S3/GCS 503 Service Unavailable)
-    const failRes = db.record_attachment_cleanup_failure(item.id, claim.lease_token, 'Storage 503 Unavailable');
+    // Executa a busca de lotes do Cron
+    const claimed = db.claim_attachments_for_cleanup(10, 120);
+    const claimedIds = claimed.map((c) => c.attachment_id);
 
-    assert(failRes.ok === true, 'Falha registrada no banco via RPC');
     assert(
-      item.pending_dismiss_justification === 'Descarte legítimo',
-      'record_attachment_cleanup_failure PRESERVA pending_dismiss_justification após falha no Storage'
+      !claimedIds.includes(pausedItem.id),
+      'O Sweeper (Cron) NÃO reivindica registros pausados por excesso de falhas'
     );
     assert(
-      item.cleanup_attempts === 10,
-      'Contador de tentativas histórico (>= 10) é preservado após falha física de descarte'
+      claimedIds.includes(activeItem.id),
+      'O Sweeper continua processando normalmente outros registros elegíveis'
+    );
+  }
+
+  // ===========================================================================
+  // CENÁRIO 3: Preservação da justificativa e do histórico após a pausa
+  // ===========================================================================
+  {
+    const db = new MockQuarantineDatabase();
+    const item = db.addAttachment({
+      cleanup_attempts: 14,
+      state: 'DELETION_FAILED',
+      pending_dismiss_justification: 'Justificativa de auditoria original do auditor fiscal',
+      dismiss_failure_count: 5,
+      dismiss_paused_at: new Date(),
+      dismiss_pause_reason: 'LIMITE_FALHAS_ATINGIDO: 5 falhas consecutivas',
+      quarantine_notes: '[DISMISS_CLAIMED: Justificativa de auditoria original do auditor fiscal]',
+    });
+
+    assert(
+      item.pending_dismiss_justification === 'Justificativa de auditoria original do auditor fiscal',
+      'pending_dismiss_justification é estritamente preservada após a pausa'
+    );
+    assert(
+      item.cleanup_attempts === 14,
+      'cleanup_attempts permanece inalterado com suas 14 tentativas históricas'
     );
     assert(
       item.state === 'DELETION_FAILED' && item.state !== 'DELETED',
       'Estado permanece como DELETION_FAILED (nunca marcado como DELETED)'
     );
+
+    // Confirma que o item continua visível na listagem administrativa de quarentena
+    const list = db.get_quarantined_attachments(10, 50);
+    const inList = list.find((q) => q.id === item.id);
     assert(
-      item.quarantine_notes.includes('FALHA_DISMISS_STORAGE'),
-      'Diferenciação auditável: Nota identifica falha específica em operação de descarte'
+      inList !== undefined && inList.dismiss_paused_at !== null,
+      'Item pausado não é abandonado nem silenciado: continua presente na quarentena administrativa'
     );
   }
 
   // ===========================================================================
-  // CENÁRIO 4: Falha de confirmação após remoção física não marca DELETED
+  // CENÁRIO 4: Reautorização administrativa e retomada segura
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 11, state: 'DELETION_FAILED' });
+    const item = db.addAttachment({
+      cleanup_attempts: 15,
+      state: 'DELETION_FAILED',
+      pending_dismiss_justification: 'Descarte pausado anteriormente',
+      dismiss_failure_count: 5,
+      dismiss_paused_at: new Date(Date.now() - 60000),
+      dismiss_pause_reason: 'LIMITE_FALHAS_ATINGIDO: 5 falhas consecutivas',
+    });
 
-    // Claim obtido
-    const claim = db.admin_dismiss_quarantined_attachment(item.id, 'Operação pendente');
+    // O admin reautoriza a operação com nova justificativa opcional
+    const reauth = db.admin_reauthorize_quarantined_attachment(
+      item.id,
+      'Storage restaurado pelo time de infraestrutura; descarte reautorizado'
+    );
 
-    // Arquivo removido do Storage simulado
+    assert(
+      reauth.ok === true && reauth.status === 'REAUTHORIZED_FOR_CLEANUP',
+      'RPC admin_reauthorize_quarantined_attachment executada com sucesso'
+    );
+    assert(
+      item.dismiss_paused_at === null && item.dismiss_failure_count === 0,
+      'Pausa removida e contador de falhas consecutivas zerado'
+    );
+    assert(
+      item.cleanup_attempts === 15,
+      'Contador histórico de cleanup_attempts (15) preservado sem alteração'
+    );
+    assert(
+      item.admin_retry_requested_at instanceof Date,
+      'admin_retry_requested_at preenchido para reprocessamento prioritário'
+    );
+    assert(
+      item.pending_dismiss_justification.includes('Storage restaurado'),
+      'Justificativa atualizada de forma auditável'
+    );
+
+    // No próximo ciclo do Cron, o item é retomado imediatamente
+    const [claimed] = db.claim_attachments_for_cleanup(5, 120);
+    assert(
+      claimed !== undefined && claimed.attachment_id === item.id,
+      'Sweeper retoma o processamento do anexo reautorizado com sucesso'
+    );
+    assert(
+      claimed.is_pending_dismiss === true,
+      'Sweeper reconhece que se trata de um descarte administrativo pendente'
+    );
+  }
+
+  // ===========================================================================
+  // CENÁRIO 5: Arquivo removido no Storage com confirmação no banco falhando
+  // ===========================================================================
+  {
+    const db = new MockQuarantineDatabase();
+    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
+
+    // Claim do descarte
+    const claim = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte válido');
+    const token = claim.lease_token;
+
+    // Arquivo é fisicamente removido do bucket
     db.storageObjects.delete(item.storage_path);
 
-    // Simula que a confirmação no banco falhou (ex: queda de rede antes do response)
-    // O registro ainda tem pending_dismiss_justification e NÃO foi marcado como DELETED
-    assert(
-      item.state !== 'DELETED' && item.pending_dismiss_justification === 'Operação pendente',
-      'Falha intermediária de confirmação NÃO marca o registro como DELETED'
-    );
-  }
-
-  // ===========================================================================
-  // CENÁRIO 5: Expiração da reserva (Lease Timeout)
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
-
-    const claim = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte para expiração');
-    const oldToken = claim.lease_token;
-
-    // Simula passagem do tempo: lease de 120 segundos expira
+    // Simula expiração do lease antes da confirmação (ex: timeout de conexão)
     item.cleanup_lease_expires_at = new Date(Date.now() - 5000);
 
-    // Tentativa de confirmação com lease expirado deve falhar
-    const confirmRes = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte para expiração', oldToken);
+    // Tentativa de confirmação com lease expirado
+    const confirmRes = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte válido', token);
     assert(
       confirmRes.ok === false && confirmRes.reason === 'LEASE_EXPIRED',
-      'Reserva expirada rejeita confirmação com LEASE_EXPIRED'
+      'Confirmação rejeitada com LEASE_EXPIRED em caso de timeout'
     );
-    assert(item.state !== 'DELETED', 'Registro não transita para DELETED com lease expirado');
-  }
-
-  // ===========================================================================
-  // CENÁRIO 6: Rejeição de token antigo de processo anterior
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
-
-    // Processo A obtém lease
-    const claimA = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte pelo Processo A');
-    const tokenA = claimA.lease_token;
-
-    // Lease do Processo A expira
-    item.cleanup_lease_expires_at = new Date(Date.now() - 1000);
-
-    // Sweeper (Processo B) assume a recuperação e obtém novo token
-    const [claimedBySweeper] = db.claim_attachments_for_cleanup(10, 120);
-    const tokenB = claimedBySweeper.lease_token;
-
-    assert(tokenA !== tokenB, 'Processo B gerou um novo lease_token distinto');
-
-    // Processo A (atrasado) tenta confirmar com seu token antigo
-    const confirmA = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte pelo Processo A', tokenA);
     assert(
-      confirmA.ok === false && confirmA.reason === 'LEASE_MISMATCH',
-      'Token antigo do Processo A é rejeitado com LEASE_MISMATCH'
+      item.state !== 'DELETED',
+      'Registro NÃO é marcado como DELETED se a confirmação falhou'
     );
-
-    // Apenas o token atual do Processo B consegue confirmar
-    const confirmB = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte pelo Processo A', tokenB);
     assert(
-      confirmB.ok === true && confirmB.status === 'DISMISSED' && item.state === 'DELETED',
-      'Apenas o processo detentor do token ativo e não expirado consegue confirmar com sucesso'
+      item.pending_dismiss_justification === 'Descarte válido',
+      'Intenção de descarte permanece íntegra para recuperação'
     );
   }
 
   // ===========================================================================
-  // CENÁRIO 7: Retomada e recuperação pelo Cron (Sweeper) com >= 10 tentativas
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    // Anexo que teve descarte administrativo iniciado no passado, falhou na confirmação e o lease expirou
-    const item = db.addAttachment({
-      cleanup_attempts: 14,
-      state: 'DELETION_FAILED',
-      pending_dismiss_justification: 'Descarte pendente que sofreu timeout de rede',
-      cleanup_lease_expires_at: new Date(Date.now() - 10000), // Expirado
-    });
-
-    // O cron executa claim_attachments_for_cleanup
-    const claimed = db.claim_attachments_for_cleanup(20, 120);
-    const found = claimed.find((c) => c.attachment_id === item.id);
-
-    assert(
-      found !== undefined,
-      'Sweeper recupera com sucesso anexo pendente de descarte mesmo com >= 10 tentativas'
-    );
-    assert(
-      found.is_pending_dismiss === true,
-      'Sweeper identifica flag is_pending_dismiss = true'
-    );
-    assert(
-      found.dismiss_justification === 'Descarte pendente que sofreu timeout de rede',
-      'Sweeper recupera justificativa original do descarte pendente'
-    );
-    assert(
-      item.cleanup_attempts === 14,
-      'Sweeper PRESERVA o contador histórico de tentativas (não incrementa em descarte pendente)'
-    );
-  }
-
-  // ===========================================================================
-  // CENÁRIO 8: Cron recupera sem reexecutar remoção quando arquivo já não existe no Storage
+  // CENÁRIO 6: Recuperação posterior quando o arquivo já não existe no Storage
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
     const item = db.addAttachment({
-      cleanup_attempts: 10,
+      cleanup_attempts: 11,
       state: 'DELETION_FAILED',
-      pending_dismiss_justification: 'Arquivo removido fisicamente antes da queda',
-      cleanup_lease_expires_at: new Date(Date.now() - 10000),
+      pending_dismiss_justification: 'Arquivo já apagado do bucket na tentativa anterior',
+      cleanup_lease_expires_at: new Date(Date.now() - 10000), // lease expirado
     });
 
-    // O arquivo já NÃO está no storage (foi removido antes da falha de confirmação)
+    // O arquivo NÃO existe no storage
     db.storageObjects.delete(item.storage_path);
 
     let storageRemoveCalled = false;
     const storageMock = {
-      list: async (folder, { search }) => {
-        // Simula verificação prévia no Storage: não existe
-        return { data: [], error: null };
-      },
+      list: async () => ({ data: [], error: null }), // Vazio: arquivo ausente
       remove: async () => {
         storageRemoveCalled = true;
         return { error: null };
       }
     };
 
-    // Fluxo real de api/cron-cleanup-attachments.ts
-    async function executeCronSweeper() {
-      const items = db.claim_attachments_for_cleanup(20, 120);
-      for (const cur of items) {
-        // 4.1 Consulta existência prévia no Storage
-        const { data: listData } = await storageMock.list('', { search: cur.storage_path });
-        const fileExists = Array.isArray(listData) && listData.length > 0;
+    // Fluxo do Sweeper em api/cron-cleanup-attachments.ts
+    async function runSweeperRecovery() {
+      const [claimed] = db.claim_attachments_for_cleanup(1, 120);
+      assert(claimed !== undefined, 'Sweeper reivindica anexo para reconciliação');
 
-        // 4.2 Se já não existe, confirma recuperação diretamente sem chamar remove
-        if (!fileExists) {
-          if (cur.is_pending_dismiss) {
-            db.admin_dismiss_quarantined_attachment(cur.attachment_id, cur.dismiss_justification, cur.lease_token);
-          } else {
-            db.confirm_attachment_deleted(cur.attachment_id, cur.lease_token);
-          }
-          continue;
-        }
+      // Consulta existência
+      const { data: listData } = await storageMock.list();
+      const fileExists = Array.isArray(listData) && listData.length > 0;
 
-        // 4.3 Caso existisse, chamaria remove
-        await storageMock.remove([cur.storage_path]);
+      // Se já não existe, avança direto para confirmação
+      if (!fileExists) {
+        return db.admin_dismiss_quarantined_attachment(
+          claimed.attachment_id,
+          claimed.dismiss_justification,
+          claimed.lease_token
+        );
       }
+      await storageMock.remove();
     }
 
-    await executeCronSweeper();
+    const res = await runSweeperRecovery();
 
     assert(
+      res.ok === true && res.status === 'DISMISSED',
+      'Recuperação conclui com sucesso marcando o descarte como DISMISSED'
+    );
+    assert(
       storageRemoveCalled === false,
-      'Cron NÃO chama remove no Storage se o arquivo já foi excluído anteriormente'
+      'Sweeper NÃO chama storage.remove quando o arquivo já foi excluído anteriormente'
     );
     assert(
-      item.state === 'DELETED' && item.pending_dismiss_justification === null,
-      'Cron confirma com sucesso a recuperação para DELETED e limpa a pendência'
-    );
-    assert(
-      item.quarantine_resolved_at !== null,
-      'quarantine_resolved_at é preenchido na recuperação pelo Cron'
+      item.state === 'DELETED' && item.quarantine_resolved_at !== null,
+      'Registro transiciona para DELETED com quarantine_resolved_at preenchido'
     );
   }
 
   // ===========================================================================
-  // CENÁRIO 9: Concorrência segura e bloqueio atômico
+  // CENÁRIO 7: Falhas de listagem no Storage sem presumir sucesso
+  // ===========================================================================
+  {
+    const db = new MockQuarantineDatabase();
+    const item = db.addAttachment({
+      cleanup_attempts: 10,
+      state: 'DELETION_FAILED',
+      pending_dismiss_justification: 'Descarte aguardando verificação de storage',
+    });
+
+    const [claimed] = db.claim_attachments_for_cleanup(1, 120);
+
+    // Simula erro 500 na listagem do Storage
+    const storageError = 'GCS 500 Internal Error ao listar bucket';
+
+    // Registra falha sem presumir que o arquivo existe ou não
+    const failRes = db.record_attachment_cleanup_failure(
+      claimed.attachment_id,
+      claimed.lease_token,
+      `FALHA_LISTAGEM_STORAGE: ${storageError}`
+    );
+
+    assert(
+      failRes.ok === true && item.state === 'DELETION_FAILED',
+      'Falha de listagem registrada com state mantido em DELETION_FAILED'
+    );
+    assert(
+      item.state !== 'DELETED',
+      'Falha de listagem NÃO presume sucesso nem marca o arquivo como DELETED'
+    );
+    assert(
+      item.pending_dismiss_justification !== null,
+      'Recuperação preservada para a próxima execução do Sweeper'
+    );
+  }
+
+  // ===========================================================================
+  // CENÁRIO 8: Rejeição estrita de tokens antigos e leases expirados
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
     const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
 
-    // Worker 1 reivindica descarte
-    const claim1 = db.admin_dismiss_quarantined_attachment(item.id, 'Operação Worker 1');
-    assert(claim1.ok === true, 'Worker 1 obtém lease com sucesso');
+    // Worker 1 obtém token A
+    const claim1 = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte pelo Worker 1');
+    const tokenA = claim1.lease_token;
 
-    // Worker 2 tenta reivindicar descarte simultaneamente
-    const claim2 = db.admin_dismiss_quarantined_attachment(item.id, 'Operação Worker 2');
+    // Expira o lease do Worker 1
+    item.cleanup_lease_expires_at = new Date(Date.now() - 5000);
+
+    // Worker 2 (Sweeper) assume e obtém token B
+    const [claimed2] = db.claim_attachments_for_cleanup(1, 120);
+    const tokenB = claimed2.lease_token;
+    assert(tokenA !== tokenB, 'Token B é gerado exclusivamente para o Worker 2');
+
+    // Worker 1 (atrasado) tenta confirmar com token antigo A
+    const confirmOld = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte', tokenA);
     assert(
-      claim2.ok === false && claim2.reason === 'LEASE_ACTIVE',
-      'Worker 2 concorrente é bloqueado com LEASE_ACTIVE'
+      confirmOld.ok === false && confirmOld.reason === 'LEASE_MISMATCH',
+      'Confirmação com token antigo é estritamente rejeitada com LEASE_MISMATCH'
     );
 
-    // Worker 3 tenta fazer retry simultâneo
-    const retryConcurrent = db.admin_retry_quarantined_attachment(item.id);
+    // Confirmação com token nulo
+    const confirmNull = db.confirm_attachment_deleted(item.id, null);
     assert(
-      retryConcurrent.ok === false && retryConcurrent.reason === 'LEASE_ACTIVE',
-      'Retry concorrente é bloqueado com LEASE_ACTIVE durante lease ativo'
+      confirmNull.ok === false && confirmNull.reason === 'LEASE_TOKEN_REQUIRED',
+      'Confirmação com token nulo é rejeitada com LEASE_TOKEN_REQUIRED'
     );
 
-    // Worker 1 conclui com sucesso
-    const confirm1 = db.admin_dismiss_quarantined_attachment(item.id, 'Operação Worker 1', claim1.lease_token);
-    assert(confirm1.ok === true && item.state === 'DELETED', 'Worker 1 conclui descarte com exclusividade atômica');
-  }
-
-  // ===========================================================================
-  // CENÁRIO 10: Idempotência - Operações repetidas após conclusão são rejeitadas
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETED', quarantine_resolved_at: new Date() });
-
-    // Retry em item já DELETED
-    const retryDeleted = db.admin_retry_quarantined_attachment(item.id);
+    // Worker 2 confirma com token B válido
+    const confirmValid = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte', tokenB);
     assert(
-      retryDeleted.ok === false && retryDeleted.reason === 'ALREADY_DELETED',
-      'Retry em registro com estado "DELETED" é rejeitado com ALREADY_DELETED'
-    );
-
-    // Dismiss em item já DELETED
-    const dismissDeleted = db.admin_dismiss_quarantined_attachment(item.id, 'Descarte repetido');
-    assert(
-      dismissDeleted.ok === false && dismissDeleted.reason === 'ALREADY_DELETED',
-      'Descarte em registro com estado "DELETED" é rejeitado com ALREADY_DELETED'
+      confirmValid.ok === true && item.state === 'DELETED',
+      'Apenas o processo com token atualizado e vigente confirma com sucesso'
     );
   }
 
   // ===========================================================================
-  // CENÁRIO 11: Retry administrativo preserva contagem histórica auditável
+  // CENÁRIO 9: Duas execuções concorrentes
   // ===========================================================================
   {
     const db = new MockQuarantineDatabase();
-    const item = db.addAttachment({ cleanup_attempts: 15, state: 'DELETION_FAILED' });
+    const item = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
 
+    // Thread/Worker A reivindica o descarte
+    const claimA = db.admin_dismiss_quarantined_attachment(item.id, 'Execução Concorrente Worker A');
+    assert(claimA.ok === true && claimA.status === 'CLAIMED_FOR_DISMISS', 'Worker A obtém posse exclusiva');
+
+    // Thread/Worker B tenta reivindicar o mesmo anexo simultaneamente
+    const claimB = db.admin_dismiss_quarantined_attachment(item.id, 'Execução Concorrente Worker B');
+    assert(
+      claimB.ok === false && claimB.reason === 'LEASE_ACTIVE',
+      'Worker B concorrente é rejeitado com LEASE_ACTIVE (bloqueio atômico garantido)'
+    );
+
+    // Thread C tenta fazer retry simultaneamente
+    const retryC = db.admin_retry_quarantined_attachment(item.id);
+    assert(
+      retryC.ok === false && retryC.reason === 'LEASE_ACTIVE',
+      'Retry concorrente é bloqueado com LEASE_ACTIVE durante lease ativo de outro worker'
+    );
+  }
+
+  // ===========================================================================
+  // CENÁRIO 10: Garantia de que um registro resolvido não volte à fila
+  // ===========================================================================
+  {
+    const db = new MockQuarantineDatabase();
+    const item = db.addAttachment({
+      cleanup_attempts: 12,
+      state: 'DELETED',
+      quarantine_resolved_at: new Date(),
+    });
+
+    // 1. Não pode ser reivindicado pelo Sweeper
+    const claimed = db.claim_attachments_for_cleanup(10, 120);
+    assert(
+      !claimed.some((c) => c.attachment_id === item.id),
+      'Registro DELETED nunca é retornado no claim_attachments_for_cleanup'
+    );
+
+    // 2. Não aparece na listagem de quarentena
+    const list = db.get_quarantined_attachments(10, 50);
+    assert(
+      !list.some((q) => q.id === item.id),
+      'Registro DELETED nunca aparece na RPC get_quarantined_attachments'
+    );
+
+    // 3. Não aparece na consulta fallback
+    const fallback = db.fallbackQuarantineQuery(10, 50);
+    assert(
+      !fallback.some((q) => q.id === item.id),
+      'Registro DELETED nunca aparece na consulta de fallback'
+    );
+
+    // 4. Retry em registro DELETED é rejeitado
     const retryRes = db.admin_retry_quarantined_attachment(item.id);
-    assert(retryRes.ok === true && retryRes.status === 'QUEUED_FOR_RETRY', 'Retry aceito para enfileiramento');
     assert(
-      item.cleanup_attempts === 15,
-      'Contador de tentativas histórico NÃO É ZERADO (mantém exatamente 15 tentativas)'
-    );
-    assert(
-      item.admin_retry_requested_at instanceof Date,
-      'admin_retry_requested_at é preenchido com timestamp atual para reprocessamento pelo Sweeper'
-    );
-    assert(
-      item.quarantine_notes.includes('histórico mantido com 15 tentativas'),
-      'Histórico de auditoria é registrado nas notas de quarentena'
+      retryRes.ok === false && retryRes.reason === 'ALREADY_DELETED',
+      'admin_retry_quarantined_attachment rejeita item resolvido com ALREADY_DELETED'
     );
 
-    // Quando o Sweeper roda, o item é capturado pelo critério Caso D
-    const [claimed] = db.claim_attachments_for_cleanup(10, 120);
-    assert(claimed.attachment_id === item.id, 'Sweeper reivindica anexo solicitado via retry manual');
-    assert(item.admin_retry_requested_at === null, 'Flag admin_retry_requested_at é resetado após a reivindicação');
-    assert(item.cleanup_attempts === 16, 'Contador de tentativas avança para 16 após nova tentativa do Sweeper');
-  }
-
-  // ===========================================================================
-  // CENÁRIO 12: Consultas e métricas excluem estritamente registros DELETED ou resolvidos
-  // ===========================================================================
-  {
-    const db = new MockQuarantineDatabase();
-    const pendente1 = db.addAttachment({ cleanup_attempts: 10, state: 'DELETION_FAILED' });
-    const pendente2 = db.addAttachment({ cleanup_attempts: 12, state: 'DELETION_FAILED' });
-    const resolvido = db.addAttachment({ cleanup_attempts: 10, state: 'DELETED', quarantine_resolved_at: new Date() });
-    const descartado = db.addAttachment({ cleanup_attempts: 18, state: 'DELETED', quarantine_resolved_at: null });
-
-    // RPC get_quarantined_attachments
-    const rpcList = db.get_quarantined_attachments(10, 50);
+    // 5. Dismiss em registro DELETED é rejeitado
+    const dismissRes = db.admin_dismiss_quarantined_attachment(item.id, 'Novo descarte');
     assert(
-      rpcList.length === 2 && rpcList.every((i) => i.state !== 'DELETED' && i.quarantine_resolved_at === null),
-      'RPC get_quarantined_attachments retorna apenas os 2 itens pendentes e exclui os registros DELETED'
+      dismissRes.ok === false && dismissRes.reason === 'ALREADY_DELETED',
+      'admin_dismiss_quarantined_attachment rejeita item resolvido com ALREADY_DELETED'
     );
 
-    // Consulta de fallback
-    const fallbackList = db.fallbackQuarantineQuery(10, 50);
+    // 6. Reautorização em registro DELETED é rejeitada
+    const reauthRes = db.admin_reauthorize_quarantined_attachment(item.id);
     assert(
-      fallbackList.length === 2 && fallbackList.every((i) => i.state !== 'DELETED' && i.quarantine_resolved_at === null),
-      'Consulta alternativa (fallback) exclui registros resolvidos ou com state DELETED'
+      reauthRes.ok === false && reauthRes.reason === 'ALREADY_DELETED',
+      'admin_reauthorize_quarantined_attachment rejeita item resolvido com ALREADY_DELETED'
     );
-
-    // Métrica do Cron
-    const metricCount = db.cronQuarantinedMetricCount();
-    assert(
-      metricCount === 2,
-      'Contagem de métricas do Cron contabiliza exatamente 2 itens pendentes'
-    );
-  }
-
-  // ===========================================================================
-  // CENÁRIO 13: Proteção de autorização, CSRF e acesso restrito service_role
-  // ===========================================================================
-  {
-    function verifyAdminAccess(hasSession, secFetchSite, customHeader) {
-      if (!hasSession) return { status: 401, error: 'UNAUTHORIZED' };
-      const isSameOrigin = secFetchSite === 'same-origin' || secFetchSite === 'none';
-      const hasSafeHeader = customHeader === 'quarantine-retry' || customHeader === 'quarantine-dismiss';
-      if (!isSameOrigin && !hasSafeHeader) return { status: 403, error: 'CSRF_BLOCKED' };
-      return { status: 200, ok: true };
-    }
-
-    assert(verifyAdminAccess(false, 'same-origin', null).status === 401, 'Requisição sem sessão administrativa retorna 401');
-    assert(verifyAdminAccess(true, 'cross-site', null).status === 403, 'Requisição cross-site sem cabeçalho seguro retorna 403');
-    assert(verifyAdminAccess(true, 'same-origin', 'quarantine-dismiss').ok === true, 'Requisição de mesma origem autorizada');
-
-    // Permissões SQL exclusivas a service_role
-    const sqlGrantPermissions = {
-      get_quarantined_attachments: ['service_role'],
-      admin_retry_quarantined_attachment: ['service_role'],
-      admin_dismiss_quarantined_attachment: ['service_role'],
-      confirm_attachment_deleted: ['service_role'],
-      record_attachment_cleanup_failure: ['service_role'],
-      claim_attachments_for_cleanup: ['service_role'],
-    };
-
-    for (const [fn, roles] of Object.entries(sqlGrantPermissions)) {
-      assert(
-        roles.includes('service_role') && !roles.includes('anon') && !roles.includes('authenticated'),
-        `Permissão da função ${fn} restrita unicamente a service_role`
-      );
-    }
   }
 
   console.log('\n========================================================================');

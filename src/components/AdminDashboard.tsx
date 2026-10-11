@@ -394,6 +394,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleQuarantineReauthorize = async (attachmentId: string) => {
+    const justification = window.prompt(
+      'Reautorizar descarte administrativo pausado (opcional, ou deixe em branco para manter a justificativa anterior):'
+    );
+    if (justification === null) return;
+
+    try {
+      const res = await fetch('/api/admin-projects?action=quarantine-reauthorize', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-action': 'quarantine-reauthorize',
+        },
+        body: JSON.stringify({
+          attachmentId,
+          justification: justification.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Descarte reautorizado com sucesso para nova tentativa pelo Sweeper.');
+        await handleFetchQuarantine();
+      } else {
+        alert(data.error || 'Falha ao reautorizar descarte.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro de rede ao reautorizar descarte.');
+    }
+  };
+
   // Busca e sincroniza arquivos do briefing selecionado
   useEffect(() => {
     // Limpa imediatamente o estado ao alternar ou carregar briefing para evitar manter arquivos anteriores
@@ -2527,6 +2558,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div className="text-neutral-500 text-[10px]">
                             Tentativas: {q.cleanup_attempts} | Erro: {q.last_cleanup_error || 'Desconhecido'}
                           </div>
+                          {q.dismiss_paused_at && (
+                            <div className="text-rose-400 font-semibold text-[10px] mt-0.5">
+                              PAUSADO ({q.dismiss_failure_count || 5} falhas consecutivas): {q.dismiss_pause_reason || q.last_cleanup_error || 'Limite de tentativas atingido'}
+                            </div>
+                          )}
                           {q.quarantine_notes && (
                             <div className="text-amber-400/80 text-[10px] truncate">
                               Auditoria: {q.quarantine_notes}
@@ -2534,17 +2570,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800">
-                            {q.state}
+                          <span className={`px-2 py-0.5 rounded text-[10px] border ${q.dismiss_paused_at ? 'bg-amber-950/80 text-amber-300 border-amber-700' : 'bg-red-950 text-red-300 border-red-800'}`}>
+                            {q.dismiss_paused_at ? 'PAUSADO' : q.state}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuarantineRetry(q.id)}
-                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
-                            title="Reenfileirar para nova tentativa com histórico preservado"
-                          >
-                            Reenfileirar
-                          </button>
+                          {q.dismiss_paused_at ? (
+                            <button
+                              type="button"
+                              onClick={() => handleQuarantineReauthorize(q.id)}
+                              className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors cursor-pointer"
+                              title="Reautorizar descarte administrativo pausado para nova tentativa no Sweeper"
+                            >
+                              Reautorizar
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleQuarantineRetry(q.id)}
+                              className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                              title="Reenfileirar para nova tentativa com histórico preservado"
+                            >
+                              Reenfileirar
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleQuarantineDismiss(q.id)}
