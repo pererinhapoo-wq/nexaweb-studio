@@ -107,7 +107,24 @@ export default async function handler(req: any, res: any) {
       });
 
       if (qErr) {
-        return res.status(500).json({ error: 'Erro ao consultar quarentena de anexos.', details: qErr.message });
+        const { data: fallbackList, error: fallbackErr } = await supabase
+          .from('project_attachments')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, created_at, updated_at')
+          .neq('state', 'DELETED')
+          .is('quarantine_resolved_at', null)
+          .gte('cleanup_attempts', 10)
+          .order('updated_at', { ascending: false })
+          .limit(50);
+
+        if (fallbackErr) {
+          return res.status(500).json({ error: 'Erro ao consultar quarentena de anexos.', details: fallbackErr.message });
+        }
+
+        return res.status(200).json({
+          success: true,
+          quarantinedCount: Array.isArray(fallbackList) ? fallbackList.length : 0,
+          quarantined: fallbackList || [],
+        });
       }
 
       return res.status(200).json({
@@ -135,12 +152,14 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: 'Erro ao reivindicar anexos para limpeza.' });
     }
 
-    // Consulta total de itens em quarentena no sistema
+    // Consulta total de itens em quarentena pendentes de resolução no sistema (exclui DELETED e resolvidos)
     let quarantinedCount = 0;
     try {
       const { count } = await supabase
         .from('project_attachments')
         .select('id', { count: 'exact', head: true })
+        .neq('state', 'DELETED')
+        .is('quarantine_resolved_at', null)
         .gte('cleanup_attempts', 10);
       quarantinedCount = typeof count === 'number' ? count : 0;
     } catch {

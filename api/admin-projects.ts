@@ -128,6 +128,21 @@ export default async function handler(req: any, res: any) {
 
         if (retryErr || !retryRes?.ok) {
           const reason = retryErr?.message || retryRes?.reason || 'Falha ao reenfileirar anexo.';
+          if (reason === 'ATTACHMENT_NOT_FOUND') {
+            return res.status(404).json({ error: 'Anexo não encontrado.' });
+          }
+          if (reason === 'ALREADY_DELETED') {
+            return res.status(409).json({ error: 'O anexo já foi excluído/resolvido e não pode sofrer nova tentativa.' });
+          }
+          if (reason === 'INVALID_STATE') {
+            return res.status(400).json({ error: 'Estado do anexo incompatível com nova tentativa de limpeza.' });
+          }
+          if (reason === 'NOT_IN_QUARANTINE') {
+            return res.status(400).json({ error: 'O anexo não está em quarentena (requer ao menos 10 tentativas de limpeza).' });
+          }
+          if (reason === 'LEASE_ACTIVE') {
+            return res.status(409).json({ error: 'O anexo possui lease ativo por worker ou operação concorrente em execução.' });
+          }
           return res.status(400).json({ error: reason });
         }
 
@@ -140,7 +155,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 4.2 Dismiss administrativo com justificativa e remoção física prévia
+    // 4.2 Dismiss administrativo com validação atômica prévia, lease de operação e confirmação estrita
     if (action === 'quarantine-dismiss') {
       const attachmentId = (bodyData?.attachmentId || queryParams.attachmentId || '').trim();
       const justification = (bodyData?.justification || '').trim();
@@ -155,34 +170,48 @@ export default async function handler(req: any, res: any) {
       }
 
       try {
-        // Consulta registro para validação de posse e lease
-        const { data: attRec, error: fetchErr } = await supabase
-          .from('project_attachments')
-          .select('id, storage_path, cleanup_attempts, cleanup_lease_expires_at, state')
-          .eq('id', attachmentId)
-          .single();
+        // FASE 1: Validação atômica e claim com lease no banco ANTES de qualquer remoção no Storage
+        const { data: claimRes, error: claimErr } = await supabase.rpc(
+          'admin_dismiss_quarantined_attachment',
+          {
+            p_attachment_id: attachmentId,
+            p_justification: justification,
+          }
+        );
 
-        if (fetchErr || !attRec) {
-          return res.status(404).json({ error: 'Anexo não encontrado.' });
-        }
-        if (attRec.cleanup_attempts < 10) {
-          return res.status(400).json({
-            error: 'O anexo não está em quarentena (requer ao menos 10 tentativas de limpeza).',
-          });
-        }
-        if (attRec.cleanup_lease_expires_at && new Date(attRec.cleanup_lease_expires_at) > new Date()) {
-          return res.status(409).json({
-            error: 'O anexo possui lease ativo por worker em execução. Aguarde a expiração do lease.',
-          });
+        if (claimErr || !claimRes?.ok) {
+          const reason = claimErr?.message || claimRes?.reason || 'Falha ao reivindicar anexo para descarte.';
+          if (reason === 'ATTACHMENT_NOT_FOUND') {
+            return res.status(404).json({ error: 'Anexo não encontrado.' });
+          }
+          if (reason === 'ALREADY_DELETED') {
+            return res.status(409).json({ error: 'O anexo já foi excluído/resolvido e não pode ser descartado novamente.' });
+          }
+          if (reason === 'INVALID_STATE') {
+            return res.status(400).json({ error: 'Estado do anexo incompatível com operação de descarte.' });
+          }
+          if (reason === 'NOT_IN_QUARANTINE') {
+            return res.status(400).json({ error: 'O anexo não está em quarentena (requer ao menos 10 tentativas de limpeza).' });
+          }
+          if (reason === 'LEASE_ACTIVE') {
+            return res.status(409).json({ error: 'O anexo possui lease ativo por worker ou operação concorrente em execução.' });
+          }
+          if (reason === 'JUSTIFICATION_REQUIRED') {
+            return res.status(400).json({ error: 'Justificativa de auditoria obrigatória (mínimo de 5 caracteres).' });
+          }
+          return res.status(400).json({ error: reason });
         }
 
-        // Tenta remover o arquivo físico no Storage primeiro
+        const leaseToken = claimRes.lease_token;
+        const storagePath = claimRes.storage_path;
+
+        // FASE 2: Remoção física no Storage (somente executada após claim validado no banco)
         let storageRemoved = false;
         let storageErrorMsg: string | null = null;
         try {
           const { error: removeErr } = await supabase.storage
             .from('nexaweb-vault')
-            .remove([attRec.storage_path]);
+            .remove([storagePath]);
 
           if (removeErr) {
             storageErrorMsg = removeErr.message;
@@ -193,30 +222,39 @@ export default async function handler(req: any, res: any) {
           storageErrorMsg = storageEx?.message || 'Exceção na remoção do Storage';
         }
 
-        // Se houve erro no Storage, não finaliza como DELETED e mantém rastreável
+        // Se a remoção física falhou, libera o lease com falha para recuperação segura e auditoria
         if (!storageRemoved && storageErrorMsg) {
           console.error('ADMIN_DISMISS_STORAGE_FAILED', {
-            path: attRec.storage_path,
+            path: storagePath,
             error: storageErrorMsg,
           });
+
+          await supabase.rpc('record_attachment_cleanup_failure', {
+            p_attachment_id: attachmentId,
+            p_lease_token: leaseToken,
+            p_error: `ADMIN_DISMISS_STORAGE_ERROR: ${storageErrorMsg}`,
+          });
+
           return res.status(500).json({
-            error: `Falha na remoção física no Storage: ${storageErrorMsg}. O item foi mantido em quarentena para auditoria.`,
+            error: `Falha na remoção física no Storage: ${storageErrorMsg}. O item foi mantido em quarentena para recuperação segura.`,
           });
         }
 
-        // Confirmação auditada no banco via RPC
-        const { data: dismissRes, error: dismissErr } = await supabase.rpc(
+        // FASE 3: Confirmação definitiva no banco validando o token do lease
+        const { data: confirmRes, error: confirmErr } = await supabase.rpc(
           'admin_dismiss_quarantined_attachment',
           {
             p_attachment_id: attachmentId,
             p_justification: justification,
+            p_lease_token: leaseToken,
           }
         );
 
-        if (dismissErr || !dismissRes?.ok) {
-          console.error('ADMIN_DISMISS_RPC_FAILED', dismissErr || dismissRes);
+        if (confirmErr || !confirmRes?.ok) {
+          console.error('ADMIN_DISMISS_CONFIRM_RPC_FAILED', confirmErr || confirmRes);
+          const confirmReason = confirmErr?.message || confirmRes?.reason || 'Falha na confirmação do descarte';
           return res.status(500).json({
-            error: `Arquivo removido do Storage, mas falha ao atualizar banco: ${dismissErr?.message || dismissRes?.reason}`,
+            error: `Arquivo removido do Storage, mas falha ao atualizar banco: ${confirmReason}. A operação não foi confirmada como sucesso.`,
           });
         }
 
@@ -351,7 +389,9 @@ export default async function handler(req: any, res: any) {
       if (qErr) {
         const { data: fallbackList } = await supabase
           .from('project_attachments')
-          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, created_at, updated_at')
+          .select('id, project_id, storage_path, mime_type, size_bytes, state, cleanup_attempts, last_cleanup_error, quarantine_notes, quarantine_resolved_at, created_at, updated_at')
+          .neq('state', 'DELETED')
+          .is('quarantine_resolved_at', null)
           .gte('cleanup_attempts', 10)
           .order('updated_at', { ascending: false })
           .limit(50);

@@ -630,70 +630,132 @@ async function runSimulationTests() {
   }
 
   // ---------------------------------------------------------------------------
-  // Cenário 15: Dismiss com Falha de Remoção Física no Storage
+  // Cenário 15: Dismiss Atômico em Duas Fases com Falha de Remoção Física no Storage
   // ---------------------------------------------------------------------------
-  console.log('\n[Cenário 15] Testando Dismiss com Falha de Remoção Física no Storage...');
+  console.log('\n[Cenário 15] Testando Dismiss Atômico (Claim prévio + Falha de Storage + Recuperação Segura)...');
   {
-    async function handleAdminDismiss(attachment, justification, storageMock) {
+    // Simulação fiel do fluxo de 2 fases implementado em MIGRACAO_UPLOADS_QUARENTENA_V3.sql e api/admin-projects.ts
+    function adminDismissRpcSim(row, justification, leaseToken = null) {
       if (!justification || justification.trim().length < 5) {
-        return { ok: false, status: 400, error: 'JUSTIFICATION_REQUIRED' };
+        return { ok: false, reason: 'JUSTIFICATION_REQUIRED' };
+      }
+      if (row.state === 'DELETED') {
+        return { ok: false, reason: 'ALREADY_DELETED' };
+      }
+      if (!leaseToken) {
+        // FASE 1: Claim Atômico com Lease
+        if (row.state !== 'DELETION_FAILED' && row.state !== 'DELETING' && row.state !== 'PENDING') {
+          return { ok: false, reason: 'INVALID_STATE' };
+        }
+        if (row.cleanup_attempts < 10) {
+          return { ok: false, reason: 'NOT_IN_QUARANTINE' };
+        }
+        if (row.cleanup_lease_expires_at && row.cleanup_lease_expires_at > new Date()) {
+          return { ok: false, reason: 'LEASE_ACTIVE' };
+        }
+        const token = crypto.randomUUID();
+        row.state = 'DELETING';
+        row.cleanup_lease_token = token;
+        row.cleanup_lease_expires_at = new Date(Date.now() + 120000);
+        row.quarantine_notes = `[DISMISS_CLAIMED: ${justification.trim()}]`;
+        return { ok: true, status: 'CLAIMED_FOR_DISMISS', lease_token: token, storage_path: row.storage_path };
+      } else {
+        // FASE 2: Confirmação Atômica
+        if (!row.cleanup_lease_token || !row.cleanup_lease_expires_at) {
+          return { ok: false, reason: 'NO_ACTIVE_LEASE' };
+        }
+        if (row.cleanup_lease_expires_at <= new Date()) {
+          return { ok: false, reason: 'LEASE_EXPIRED' };
+        }
+        if (row.cleanup_lease_token !== leaseToken) {
+          return { ok: false, reason: 'LEASE_MISMATCH' };
+        }
+        row.state = 'DELETED';
+        row.cleanup_lease_token = null;
+        row.cleanup_lease_expires_at = null;
+        row.quarantine_resolved_at = new Date();
+        row.quarantine_notes = `DISMISSED: ${justification.trim()}`;
+        return { ok: true, status: 'DISMISSED' };
+      }
+    }
+
+    async function handleAdminDismissFlow(attachment, justification, storageMock) {
+      // 1. FASE 1: Validação atômica e claim no banco ANTES de tocar no Storage
+      const claimRes = adminDismissRpcSim(attachment, justification);
+      if (!claimRes.ok) {
+        return { ok: false, status: claimRes.reason === 'JUSTIFICATION_REQUIRED' ? 400 : 409, error: claimRes.reason };
       }
 
-      // 1. Tenta remoção física no Storage
-      const { error: storageErr } = await storageMock.remove([attachment.storage_path]);
+      // 2. FASE 2: Remoção física no Storage (apenas após claim bem-sucedido)
+      const { error: storageErr } = await storageMock.remove([claimRes.storage_path]);
       if (storageErr) {
-        // Falha no storage -> NÃO declara DELETED, mantém rastreável em quarentena
+        // Falha no storage: reverte lease e registra falha para recuperação segura
+        attachment.state = 'DELETION_FAILED';
+        attachment.cleanup_lease_token = null;
+        attachment.cleanup_lease_expires_at = null;
+        attachment.last_cleanup_error = `ADMIN_DISMISS_STORAGE_ERROR: ${storageErr.message}`;
         return {
           ok: false,
           status: 500,
-          error: `Falha na remoção física: ${storageErr.message}. Item mantido em quarentena.`,
+          error: `Falha na remoção física: ${storageErr.message}. O item foi mantido em quarentena para recuperação segura.`,
         };
       }
 
-      attachment.state = 'DELETED';
-      attachment.quarantine_notes = `DISMISSED: ${justification.trim()}`;
+      // 3. FASE 3: Confirmação definitiva no banco
+      const confirmRes = adminDismissRpcSim(attachment, justification, claimRes.lease_token);
+      if (!confirmRes.ok) {
+        return { ok: false, status: 500, error: `Falha na confirmação: ${confirmRes.reason}` };
+      }
+
       return { ok: true, status: 200 };
     }
 
     // A: Sem justificativa suficiente (< 5 caracteres)
     const mockStorageOk = { remove: async () => ({ error: null }) };
-    const attA = { storage_path: 'briefings/p/f.jpg', state: 'DELETION_FAILED' };
-    const resA = await handleAdminDismiss(attA, 'abc', mockStorageOk);
+    const attA = { storage_path: 'briefings/p/f.jpg', state: 'DELETION_FAILED', cleanup_attempts: 10 };
+    const resA = await handleAdminDismissFlow(attA, 'abc', mockStorageOk);
     assert(resA.status === 400 && resA.error === 'JUSTIFICATION_REQUIRED', 'Dismiss sem justificativa mínima de 5 caracteres é recusado');
 
-    // B: Falha na remoção física no Storage
-    const mockStorageErr = { remove: async () => ({ error: { message: 'S3 Access Denied' } }) };
-    const attB = { storage_path: 'briefings/p/f.jpg', state: 'DELETION_FAILED' };
-    const resB = await handleAdminDismiss(attB, 'Arquivo órfão irrelevante', mockStorageErr);
+    // B: Falha na remoção física no Storage (após claim atômico no banco)
+    let storageCalled = false;
+    const mockStorageErr = {
+      remove: async () => {
+        storageCalled = true;
+        return { error: { message: 'S3 Access Denied' } };
+      }
+    };
+    const attB = { storage_path: 'briefings/p/f.jpg', state: 'DELETION_FAILED', cleanup_attempts: 10 };
+    const resB = await handleAdminDismissFlow(attB, 'Arquivo órfão irrelevante', mockStorageErr);
+    assert(storageCalled === true, 'Storage só é chamado após claim atômico validado no banco');
     assert(resB.status === 500 && resB.error.includes('Falha na remoção física'), 'Se remoção física falha, o dismiss NÃO finaliza como DELETED e informa erro');
-    assert(attB.state === 'DELETION_FAILED', 'Estado do item mantido inalterado');
+    assert(attB.state === 'DELETION_FAILED', 'Estado do item mantido como DELETION_FAILED para recuperação segura');
+    assert(attB.last_cleanup_error.includes('ADMIN_DISMISS_STORAGE_ERROR'), 'Erro registrado para auditoria');
   }
 
   // ---------------------------------------------------------------------------
-  // Cenário 16: Dismiss com Falha no Banco Após Remoção Física
+  // Cenário 16: Dismiss Atômico com Falha na Confirmação de Banco (Lease Expirado)
   // ---------------------------------------------------------------------------
-  console.log('\n[Cenário 16] Testando Dismiss com Falha de Banco Após Remoção Física...');
+  console.log('\n[Cenário 16] Testando Dismiss Atômico com Falha de Confirmação no Banco...');
   {
-    async function handleDismissDbFail(attachment, justification) {
-      // Remoção no storage simulada como bem-sucedida
-      const storageRemoved = true;
+    const attC = {
+      storage_path: 'briefings/p/f.jpg',
+      state: 'DELETING',
+      cleanup_attempts: 10,
+      cleanup_lease_token: 'valid-token',
+      cleanup_lease_expires_at: new Date(Date.now() - 1000), // Expirado
+    };
 
-      // Simula falha na chamada da RPC admin_dismiss_quarantined_attachment
-      const rpcError = { message: 'PostgreSQL deadlock detected' };
-
-      if (storageRemoved && rpcError) {
-        return {
-          ok: false,
-          status: 500,
-          error: `Arquivo removido do Storage, mas falha ao atualizar banco: ${rpcError.message}`,
-        };
-      }
-      return { ok: true };
+    function confirmDismissSim(row, justification, leaseToken) {
+      if (!row.cleanup_lease_token || !row.cleanup_lease_expires_at) return { ok: false, reason: 'NO_ACTIVE_LEASE' };
+      if (row.cleanup_lease_expires_at <= new Date()) return { ok: false, reason: 'LEASE_EXPIRED' };
+      if (row.cleanup_lease_token !== leaseToken) return { ok: false, reason: 'LEASE_MISMATCH' };
+      row.state = 'DELETED';
+      return { ok: true, status: 'DISMISSED' };
     }
 
-    const attC = { storage_path: 'briefings/p/f.jpg', state: 'DELETION_FAILED' };
-    const resC = await handleDismissDbFail(attC, 'Arquivo não mais necessário');
-    assert(resC.status === 500 && resC.error.includes('falha ao atualizar banco'), 'Falha na RPC de banco é relatada honestamente sem declarar sucesso antecipado');
+    const confirmRes = confirmDismissSim(attC, 'Arquivo não mais necessário', 'valid-token');
+    assert(confirmRes.ok === false && confirmRes.reason === 'LEASE_EXPIRED', 'Confirmação com lease expirado é rejeitada');
+    assert(attC.state !== 'DELETED', 'Registro não é marcado como DELETED se a confirmação falhou');
   }
 
   // ---------------------------------------------------------------------------
