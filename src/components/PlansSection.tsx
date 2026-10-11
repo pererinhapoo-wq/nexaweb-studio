@@ -10,6 +10,8 @@ import {
   HelpCircle,
   Eye,
   PlusCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { PlanId } from '../data/plans';
 import { PLANS_DATA } from '../data/plans';
@@ -29,6 +31,22 @@ interface PlansSectionProps {
 export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
   const [detailModalPlan, setDetailModalPlan] = useState<PlanId | null>(null);
   const [advisorModalOpen, setAdvisorModalOpen] = useState(false);
+  const [isAddonsOpen, setIsAddonsOpen] = useState(false);
+
+  const toggleAddons = () => {
+    setIsAddonsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setTimeout(() => {
+          const el = document.getElementById('funcionalidades-adicionais');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+      return next;
+    });
+  };
 
   // Official plans order matching the commercial pricing table
   const plans: PlanId[] = ['Essencial', 'Profissional', 'Personalizado', 'Premium'];
@@ -64,13 +82,24 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
             <span>Ainda não sabe qual escolher? Me ajude a escolher</span>
           </button>
 
-          <a
-            href="#funcionalidades-adicionais"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-950/80 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-neutral-200 text-xs font-medium transition-all"
+          <button
+            type="button"
+            onClick={toggleAddons}
+            aria-expanded={isAddonsOpen}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-medium transition-all active:scale-[0.98] ${
+              isAddonsOpen
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20'
+                : 'bg-neutral-950/80 hover:bg-neutral-900 border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-neutral-200'
+            }`}
           >
             <PlusCircle className="w-3.5 h-3.5 text-neutral-400" />
-            <span>Ver tabela de adicionais</span>
-          </a>
+            <span>{isAddonsOpen ? 'Ocultar tabela de adicionais' : 'Ver tabela de adicionais'}</span>
+            {isAddonsOpen ? (
+              <ChevronUp className="w-3.5 h-3.5 text-amber-400 ml-0.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-neutral-400 ml-0.5" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -192,8 +221,12 @@ export const PlansSection: React.FC<PlansSectionProps> = ({ onSelectPlan }) => {
         })}
       </div>
 
-      {/* Additional Features Commercial Table */}
-      <AdditionalFeaturesTable onSelectPlan={onSelectPlan} />
+      {/* Additional Features Commercial Table (Collapsible) */}
+      {isAddonsOpen && (
+        <div className="mt-8 transition-opacity duration-300">
+          <AdditionalFeaturesTable onSelectPlan={onSelectPlan} />
+        </div>
+      )}
 
       {/* Plan Details Presentation Modal */}
       {detailModalPlan && (
